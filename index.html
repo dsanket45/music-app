@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/x-icon" href="./src/assets/dslogo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sanket Music</title>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1DB954" />
+    <!-- YouTube IFrame API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js');
+        });
+      }
+    </script>
+  </head>
+  <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
+    <div id="root"></div>
+    <!-- Hidden YouTube player container -->
+    <div id="youtube-player-container" style="width:0;height:0;visibility:hidden;"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
