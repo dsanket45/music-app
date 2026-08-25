@@ -48,6 +48,8 @@ export const AuthProvider = ({ children }) => {
 
   const login = async () => {
     setLoading(true);
+    const isCapacitorNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+
     try {
       await setPersistence(auth, browserLocalPersistence);
       const result = await signInWithPopup(auth, provider);
@@ -57,13 +59,20 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.warn('Popup login error or closed:', err);
 
+      // In Native Android APK, never redirect to external browser. Instead, log in seamlessly as Guest!
+      if (isCapacitorNative) {
+        console.log('Native Android APK active: using instant guest authentication inside app.');
+        await loginAsGuest();
+        return;
+      }
+
       if (err.code === 'auth/unauthorized-domain') {
         alert('Firebase Unauthorized Domain: Please add "dsmusics.netlify.app" and "localhost" to Firebase Console -> Authentication -> Settings -> Authorized Domains.');
         setLoading(false);
         return;
       }
 
-      // Fallback to redirect if popup is blocked or unsupported
+      // Fallback to redirect on web if popup is blocked
       if (
         err.code === 'auth/popup-blocked' ||
         err.code === 'auth/operation-not-supported-in-this-environment'
