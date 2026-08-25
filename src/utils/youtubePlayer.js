@@ -109,14 +109,28 @@ class YouTubePlayerService {
     });
   }
 
-  // Initialize Media Session API for background playback
+  // Initialize silent background audio loop to keep Android MediaSession alive
+  initSilentAudio() {
+    if (!this.silentAudio) {
+      try {
+        this.silentAudio = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=");
+        this.silentAudio.loop = true;
+        this.silentAudio.volume = 0.01;
+      } catch (e) {
+        console.error("Silent audio init failed:", e);
+      }
+    }
+  }
+
+  // Initialize Media Session API for background playback & lockscreen controls
   initMediaSession() {
     if ('mediaSession' in navigator) {
       console.log("🎵 Initializing Media Session API");
+      this.initSilentAudio();
       
       navigator.mediaSession.setActionHandler('play', () => {
         console.log("🎵 Media Session: Play");
-        this.playVideo(this.currentVideoId);
+        this.playVideo();
       });
 
       navigator.mediaSession.setActionHandler('pause', () => {
@@ -203,6 +217,9 @@ class YouTubePlayerService {
  // REPLACE your current playVideo with this:
 playVideo() {
   console.log("▶️ Resuming playback (no reload)");
+  if (this.silentAudio) {
+    this.silentAudio.play().catch(() => {});
+  }
   if (this.player && typeof this.player.playVideo === 'function') {
     this.player.playVideo();
   }
@@ -210,6 +227,9 @@ playVideo() {
 
   pauseVideo() {
     console.log("⏸️ Pausing video");
+    if (this.silentAudio) {
+      this.silentAudio.pause();
+    }
     if (this.player && typeof this.player.pauseVideo === 'function') {
       this.player.pauseVideo();
     }

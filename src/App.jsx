@@ -43,6 +43,12 @@ function App() {
             console.log('🚀 Server version is newer:', data);
             setLatestVersionData(data);
             setUpdateAvailable(true);
+            const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+            if (isNative) {
+              console.log('📱 Native App: Auto-applying Over-The-Air live update...');
+              localStorage.setItem('app_installed_timestamp', data.timestamp.toString());
+              window.location.reload(true);
+            }
           }
         }
       } catch (err) {

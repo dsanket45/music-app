@@ -149,15 +149,17 @@ const Navbar = () => {
 
           {/* Right Action Buttons: Download APK & User Profile */}
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={handleDownloadApk}
-              title="Download Native Android App for background music"
-              className="hidden xs:flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 dark:text-emerald-300 font-semibold text-xs sm:text-sm border border-emerald-200 dark:border-emerald-700/50 transition-all duration-200 active:scale-95 shadow-sm"
-            >
-              <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>Install App</span>
-              <Download className="w-3.5 h-3.5 opacity-70" />
-            </button>
+            {!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) && (
+              <button
+                onClick={handleDownloadApk}
+                title="Download Native Android App for background music"
+                className="hidden xs:flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 dark:text-emerald-300 font-semibold text-xs sm:text-sm border border-emerald-200 dark:border-emerald-700/50 transition-all duration-200 active:scale-95 shadow-sm"
+              >
+                <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>Install App</span>
+                <Download className="w-3.5 h-3.5 opacity-70" />
+              </button>
+            )}
 
             {user && (
               <button
