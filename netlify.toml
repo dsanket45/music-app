@@ -11,14 +11,20 @@
     Cache-Control = "no-cache, no-store, must-revalidate"
 
 [[redirects]]
+  from = "/*.apk"
+  to = "https://raw.githubusercontent.com/dsanket45/music-app/main/releases/dmusic.apk"
+  status = 302
+  force = true
+
+[[redirects]]
   from = "/music-app.apk"
-  to = "https://raw.githubusercontent.com/dsanket45/music-app/main/public/dmusic.apk"
+  to = "https://raw.githubusercontent.com/dsanket45/music-app/main/releases/dmusic.apk"
   status = 302
   force = true
 
 [[redirects]]
   from = "/dmusic.apk"
-  to = "https://raw.githubusercontent.com/dsanket45/music-app/main/public/dmusic.apk"
+  to = "https://raw.githubusercontent.com/dsanket45/music-app/main/releases/dmusic.apk"
   status = 302
   force = true
 
