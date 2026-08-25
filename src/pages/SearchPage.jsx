@@ -7,10 +7,7 @@ import Player from "../components/Player.jsx";
 import PlaylistModal from "../components/PlaylistModal.jsx";
 import BannerAd from "../components/Ads/BannerAd.jsx";
 import { Search, Play, Loader2, MoreVertical, X, Heart, WifiOff, AlertCircle, Music } from "lucide-react";
-import { toggleLike, getLikedSongs } from "../utils/db";
-
-const SEARCH_HISTORY_KEY = "searchHistory";
-const MAX_HISTORY = 30;
+import { toggleLike, getLikedSongs, getSearchHistory, addSearchHistorySong, removeFromSearchHistory } from "../utils/db";
 
 const SearchPage = () => {
   const { setNewQueue } = useContext(PlayerContext);
@@ -35,28 +32,34 @@ const SearchPage = () => {
     setLikedSongs(liked.map(s => s.songId));
   };
 
-  const loadSearchHistory = () => {
-    const history = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY)) || [];
-    setSearchHistory(history);
-  };
-
-  const saveToSearchHistory = (song) => {
-    const history = [...searchHistory];
-    const existingIndex = history.findIndex(s => s.songId === song.songId);
-    if (existingIndex !== -1) {
-      history.splice(existingIndex, 1);
+  const loadSearchHistory = async () => {
+    try {
+      const history = await getSearchHistory();
+      setSearchHistory(history);
+    } catch (err) {
+      console.error("Error loading search history from DB:", err);
     }
-    history.unshift(song);
-    if (history.length > MAX_HISTORY) history.pop();
-    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
-    setSearchHistory(history);
   };
 
-  const removeFromHistory = (songId, e) => {
+  const saveToSearchHistory = async (song) => {
+    try {
+      await addSearchHistorySong(song);
+      const history = await getSearchHistory();
+      setSearchHistory(history);
+    } catch (err) {
+      console.error("Error saving search history to DB:", err);
+    }
+  };
+
+  const removeFromHistory = async (songId, e) => {
     e.stopPropagation();
-    const newHistory = searchHistory.filter(s => s.songId !== songId);
-    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(newHistory));
-    setSearchHistory(newHistory);
+    try {
+      await removeFromSearchHistory(songId);
+      const history = await getSearchHistory();
+      setSearchHistory(history);
+    } catch (err) {
+      console.error("Error removing from search history in DB:", err);
+    }
   };
 
   const handleSearch = async (e) => {
