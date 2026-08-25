@@ -162,6 +162,9 @@ const InstallPrompt = () => {
 
             {/* Download Button */}
             <div className="space-y-2">
+              <div className="bg-gradient-to-r from-amber-500 via-emerald-500 to-teal-500 text-white text-xs font-black p-2.5 rounded-xl text-center shadow-md animate-pulse">
+                🔥 NEW V1.0.4 BUILD — FULL 38.5MB NATIVE APK DOWNLOAD 🔥
+              </div>
               <button
                 onClick={handleDownloadAPK}
                 disabled={isDownloading}

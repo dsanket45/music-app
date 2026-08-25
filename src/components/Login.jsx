@@ -53,6 +53,11 @@ const Login = () => {
             mounted ? 'translate-y-0 opacity-100' : '-translate-y-6 opacity-0'
           }`}
         >
+          <div className="mb-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-500/30 to-teal-500/30 border-2 border-emerald-400 text-emerald-300 text-xs sm:text-sm font-black shadow-xl animate-bounce">
+            <Sparkles size={16} className="text-emerald-400 animate-spin" />
+            <span>✨ V1.0.4 NEW BUILD LIVE ✨</span>
+          </div>
+
           <div className="relative inline-block mb-3 sm:mb-4">
             <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full blur-2xl opacity-50 animate-pulse"></div>
             <img
