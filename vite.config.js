@@ -4,17 +4,29 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  // ✅ Important: makes asset paths relative (fixes MIME/type and blank screen on Netlify)
   base: '/',
-
 
   plugins: [
     react(),
 
-    // ✅ Progressive Web App (PWA) setup
+    // MIME type plugin for direct APK downloading
+    {
+      name: 'apk-mime-type',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (req.url && req.url.includes('.apk')) {
+            res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+            res.setHeader('Content-Disposition', 'attachment; filename="D-Music-App.apk"');
+          }
+          next();
+        });
+      }
+    },
+
+    // Progressive Web App (PWA) setup
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'auto', // ensures registerSW.js auto-injected in dist/index.html
+      injectRegister: 'auto',
       includeAssets: [
         'icons/dslogo.png',
         'favicon.ico',
@@ -25,8 +37,8 @@ export default defineConfig({
         name: "Sanket's Music Streaming App",
         short_name: "SanketMusic",
         description: "Stream and enjoy music with SanketMusic app. Offline support included!",
-        theme_color: "#1DB954",
-        background_color: "#000000ff",
+        theme_color: "#10B981",
+        background_color: "#F8FAFC",
         display: "standalone",
         scope: "/",
         start_url: "/",
@@ -44,27 +56,25 @@ export default defineConfig({
         ],
       },
       workbox: {
-  globPatterns: ['**/*.{js,css,html,png,svg,ico,json}'],
-  runtimeCaching: [
-    // Your app assets
-    {
-      urlPattern: /\.(?:js|css|html|png|svg|ico)$/,
-      handler: 'CacheFirst',
-    },
-    // YouTube → NEVER cache
-    {
-      urlPattern: /^https:\/\/.*youtube\.com/,
-      handler: 'NetworkOnly',
-    },
-    {
-      urlPattern: /^https:\/\/.*googlevideo\.com/,
-      handler: 'NetworkOnly',
-    },
-  ],
-  cleanupOutdatedCaches: true,
-},
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,json}'],
+        runtimeCaching: [
+          {
+            urlPattern: /\.(?:js|css|html|png|svg|ico)$/,
+            handler: 'CacheFirst',
+          },
+          {
+            urlPattern: /^https:\/\/.*youtube\.com/,
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: /^https:\/\/.*googlevideo\.com/,
+            handler: 'NetworkOnly',
+          },
+        ],
+        cleanupOutdatedCaches: true,
+      },
       devOptions: {
-        enabled: false, // disable SW in dev mode (for smoother local debugging)
+        enabled: false,
       },
     }),
   ],
@@ -75,7 +85,6 @@ export default defineConfig({
     assetsDir: 'assets',
     rollupOptions: {
       output: {
-        // ✅ ensures consistent file names for better caching
         chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
@@ -85,7 +94,7 @@ export default defineConfig({
 
   resolve: {
     alias: {
-      '@': '/src', // cleaner imports like "@/components/Navbar"
+      '@': '/src',
     },
   },
 

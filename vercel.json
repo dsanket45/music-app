@@ -1,5 +1,21 @@
 {
+  "headers": [
+    {
+      "source": "/(.*).apk",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/vnd.android.package-archive"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"D-Music-App.apk\""
+        }
+      ]
+    }
+  ],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/music-app.apk", "destination": "/music-app.apk" },
+    { "source": "/((?!music-app\\.apk).*)", "destination": "/index.html" }
   ]
 }

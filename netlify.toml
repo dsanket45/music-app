@@ -1,5 +1,15 @@
+[[headers]]
+  for = "/*.apk"
+  [headers.values]
+    Content-Type = "application/vnd.android.package-archive"
+    Content-Disposition = "attachment; filename=\"D-Music-App.apk\""
+
+[[redirects]]
+  from = "/music-app.apk"
+  to = "/music-app.apk"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  force = true
