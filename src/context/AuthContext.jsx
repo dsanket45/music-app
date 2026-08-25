@@ -27,31 +27,22 @@ export const AuthProvider = ({ children }) => {
 
   const login = async () => {
     setLoading(true);
-    const isCapacitorNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
-
     try {
-      if (isCapacitorNative) {
-        // Android WebView blocks Google OAuth (disallowed_useragent blank page).
-        // Open Chrome Custom Tab for secure Google Sign-In
-        await Browser.open({ url: 'https://dsmusics.netlify.app/login' });
-        setLoading(false);
-        return;
-      }
-
-      // Web / PWA Sign-in flow
       await setPersistence(auth, browserLocalPersistence);
       const result = await signInWithPopup(auth, provider);
-      setUser(result.user);
+      if (result && result.user) {
+        setUser(result.user);
+      }
     } catch (err) {
       console.warn('Popup login error or closed:', err);
 
       if (err.code === 'auth/unauthorized-domain') {
-        alert('Firebase Unauthorized Domain: Please add "localhost" and "dsmusics.netlify.app" in Firebase Console -> Authentication -> Settings -> Authorized Domains.');
+        alert('Firebase Unauthorized Domain: Please add "dsmusics.netlify.app" and "localhost" to Firebase Console -> Authentication -> Settings -> Authorized Domains.');
         setLoading(false);
         return;
       }
 
-      // Fallback to redirect if popup is blocked
+      // Fallback to redirect if popup is blocked or unsupported
       if (
         err.code === 'auth/popup-blocked' ||
         err.code === 'auth/operation-not-supported-in-this-environment'
