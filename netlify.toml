@@ -11,11 +11,6 @@
     Cache-Control = "no-cache, no-store, must-revalidate"
 
 [[redirects]]
-  from = "/music-app.apk"
-  to = "/music-app.apk"
-  status = 200
-
-[[redirects]]
   from = "/__/auth/*"
   to = "https://musicapp-b45de.firebaseapp.com/__/auth/:splat"
   status = 200

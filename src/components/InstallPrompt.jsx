@@ -27,7 +27,7 @@ const InstallPrompt = () => {
   const handleDownloadAPK = () => {
     setIsDownloading(true);
     // Trigger direct APK download with cache-busting timestamp and attachment header
-    const apkUrl = `${window.location.origin}/music-app.apk?v=${Date.now()}`;
+    const apkUrl = `${window.location.origin}/dmusic.apk?v=${Date.now()}`;
     const link = document.createElement("a");
     link.href = apkUrl;
     link.setAttribute("download", "D-Music-App.apk");
