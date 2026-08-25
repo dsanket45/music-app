@@ -1,6 +1,7 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useState, useEffect } from 'react';
 import { auth, provider } from '../firebaseConfig';
+import { Browser } from '@capacitor/browser';
 import {
   signInWithPopup,
   signInWithRedirect,
@@ -26,22 +27,31 @@ export const AuthProvider = ({ children }) => {
 
   const login = async () => {
     setLoading(true);
+    const isCapacitorNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+
     try {
-      // Set persistence before auth
+      if (isCapacitorNative) {
+        // Android WebView blocks Google OAuth (disallowed_useragent blank page).
+        // Open Chrome Custom Tab for secure Google Sign-In
+        await Browser.open({ url: 'https://dsmusics.netlify.app/login' });
+        setLoading(false);
+        return;
+      }
+
+      // Web / PWA Sign-in flow
       await setPersistence(auth, browserLocalPersistence);
-      // Attempt popup first (works smoothly on modern browsers with COOP header)
       const result = await signInWithPopup(auth, provider);
       setUser(result.user);
     } catch (err) {
       console.warn('Popup login error or closed:', err);
 
       if (err.code === 'auth/unauthorized-domain') {
-        alert('Firebase Unauthorized Domain: Please add your domain (dsmusics.netlify.app) in Firebase Console -> Authentication -> Settings -> Authorized Domains.');
+        alert('Firebase Unauthorized Domain: Please add "localhost" and "dsmusics.netlify.app" in Firebase Console -> Authentication -> Settings -> Authorized Domains.');
         setLoading(false);
         return;
       }
 
-      // Fallback to redirect if popup is blocked or unsupported
+      // Fallback to redirect if popup is blocked
       if (
         err.code === 'auth/popup-blocked' ||
         err.code === 'auth/operation-not-supported-in-this-environment'
