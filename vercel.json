@@ -16,6 +16,7 @@
   ],
   "rewrites": [
     { "source": "/music-app.apk", "destination": "/music-app.apk" },
+    { "source": "/__/auth/:path*", "destination": "https://musicapp-b45de.firebaseapp.com/__/auth/:path*" },
     { "source": "/((?!music-app\\.apk).*)", "destination": "/index.html" }
   ]
 }
