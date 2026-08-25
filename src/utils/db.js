@@ -43,6 +43,11 @@ export const initDB = async () => {
         store.createIndex('name', 'name');
       }
 
+      // ================= Downloaded Songs =================
+if (!db.objectStoreNames.contains('downloadedSongs')) {
+  db.createObjectStore('downloadedSongs', { keyPath: 'songId' });
+}
+
       // ================= Search History =================
       if (!db.objectStoreNames.contains('searchHistory')) {
         const store = db.createObjectStore('searchHistory', { keyPath: 'songId' });
@@ -53,9 +58,23 @@ export const initDB = async () => {
 };
 
 // ================= Preferences =================
-export const savePreferences = async (prefs) => {
+// src/utils/db.js
+
+export const savePreferences = async (partialPrefs) => {
   const db = await initDB();
-  return db.put('preferences', { id: 'userPrefs', ...prefs });
+  
+  // Get existing preferences
+  const existing = (await db.get('preferences', 'userPrefs')) || {};
+  
+  // Merge new prefs into existing
+  const updated = {
+    id: 'userPrefs',
+    ...existing,
+    ...partialPrefs
+  };
+  
+  await db.put('preferences', updated);
+  return updated;
 };
 
 export const getPreferences = async () => {
@@ -220,4 +239,31 @@ export const getSearchHistory = async () => {
 export const removeFromSearchHistory = async (songId) => {
   const db = await initDB();
   await db.delete('searchHistory', songId);
+};
+
+
+// Save downloaded song with fileHandle
+export const saveDownloadedSong = async (song, fileHandle) => {
+  const db = await initDB();
+  await db.put('downloadedSongs', {
+    songId: song.songId,
+    title: song.title,
+    artist: song.artist,
+    thumbnail: song.thumbnail,
+    language: song.language,
+    fileHandle,
+    downloadedAt: Date.now(),
+  });
+};
+
+// Get all downloaded songs
+export const getDownloadedSongs = async () => {
+  const db = await initDB();
+  return await db.getAll('downloadedSongs');
+};
+
+// Get one downloaded song by ID
+export const getDownloadedSong = async (songId) => {
+  const db = await initDB();
+  return await db.get('downloadedSongs', songId);
 };

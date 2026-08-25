@@ -2,25 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/x-icon" href="./src/assets/dslogo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sanket Music</title>
-    <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#1DB954" />
-    <!-- YouTube IFrame API -->
+    <link rel="icon" href="/icons/dslogo.png" />
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/service-worker.js');
-        });
-      }
-    </script>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2286575716043591"
+     crossorigin="anonymous"></script>
   </head>
   <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
     <div id="root"></div>
-    <!-- Hidden YouTube player container -->
     <div id="youtube-player-container" style="width:0;height:0;visibility:hidden;"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.jsx">
+
+  if(window.location.pathname === "/") {
+    window.location.replace("/login");
+  }
+
+
+    </script>
   </body>
 </html>

@@ -1,4 +1,3 @@
-// src/components/SongCard.jsx
 import React, { useContext, useState, useEffect } from 'react';
 import { PlayerContext } from '../context/PlayerContext';
 import { toggleLike, getLikedSongs } from '../utils/db';
@@ -77,6 +76,8 @@ const SongCard = ({ song }) => {
               ? 'bg-red-500 shadow-lg shadow-red-500/50' 
               : 'bg-black/30 hover:bg-black/50'
           } ${likeAnimation ? 'scale-125' : 'scale-100'}`}
+          aria-label={isLiked ? "Remove from favorites" : "Add to favorites"}
+          title={isLiked ? "Remove from favorites" : "Add to favorites"}
         >
           <Heart 
             size={20} 
@@ -94,6 +95,11 @@ const SongCard = ({ song }) => {
         <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1">
           {song.artist}
         </p>
+        {song.duration && (
+          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+            {song.duration}
+          </p>
+        )}
       </div>
     </div>
   );

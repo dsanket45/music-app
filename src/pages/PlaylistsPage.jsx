@@ -4,6 +4,7 @@ import Navbar from "../components/Navbar";
 import BottomNav from "../components/BottomNav";
 import Player from "../components/Player";
 import { PlayerContext } from "../context/PlayerContext";
+import BannerAd from "../components/Ads/BannerAd";
 import {
   getPlaylists,
   createPlaylist,
@@ -157,6 +158,9 @@ const PlaylistPage = () => {
           ) : (
             <h1 className="text-4xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
               Playlists
+               <div className="mb-8">
+      <BannerAd />
+    </div>
             </h1>
           )}
 
@@ -176,6 +180,9 @@ const PlaylistPage = () => {
             <div className="w-16 h-16 border-4 border-gray-200 dark:border-gray-700 border-t-green-500 rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-gray-600 dark:text-gray-400">
               Loading playlists...
+               <div className="mb-8">
+      <BannerAd />
+    </div>
             </p>
           </div>
         ) : !selectedPlaylist ? (
@@ -184,6 +191,9 @@ const PlaylistPage = () => {
             {playlists.length === 0 ? (
               <p className="text-gray-400 text-center col-span-full">
                 No playlists created yet.
+                 <div className="mb-8">
+      <BannerAd />
+    </div>
               </p>
             ) : (
               playlists.map((pl) => {
@@ -325,7 +335,12 @@ const PlaylistPage = () => {
                 ))}
               </div>
             ) : (
-              <p className="text-gray-400 text-sm mt-4">No songs in this playlist.</p>
+              
+              <p className="text-gray-400 text-sm mt-4">No songs in this playlist.
+               <div className="mb-8">
+      <BannerAd />
+    </div></p>
+              
             )}
           </div>
         )}

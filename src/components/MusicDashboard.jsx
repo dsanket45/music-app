@@ -375,3 +375,84 @@
 // };
 
 // export default MusicDashboard;
+
+
+
+////
+// const CACHE_NAME = 'music-app-v1';
+// const urlsToCache = [
+//   '/',
+//   '/index.html',
+//   '/manifest.json',
+//   '/favicon.ico',
+//   '/icons/dslogo.png',
+//   '/assets/sanket1.jpg'
+//   // Add more assets (CSS, JS, images) as needed
+// ];
+
+// // Install SW and cache assets
+// self.addEventListener('install', (event) => {
+//   event.waitUntil(
+//     caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
+//   );
+//   self.skipWaiting();
+// });
+
+// // Activate SW and remove old caches
+// self.addEventListener('activate', (event) => {
+//   event.waitUntil(
+//     caches.keys().then((cacheNames) =>
+//       Promise.all(
+//         cacheNames.map((cache) => {
+//           if (cache !== CACHE_NAME) {
+//             return caches.delete(cache);
+//           }
+//         })
+//       )
+//     )
+//   );
+//   self.clients.claim();
+// });
+
+// // Fetch handler for offline support
+// self.addEventListener('fetch', (event) => {
+//   event.respondWith(
+//     caches.match(event.request).then((response) => {
+//       return (
+//         response ||
+//         fetch(event.request).catch(() =>
+//           caches.match('/index.html') // fallback for offline SPA routes
+//         )
+//       );
+//     })
+//   );
+// });
+
+// service-worker.js
+
+
+// {
+//   "short_name": "SanketMusic",
+//   "name": "Sanket's Music Streaming App",
+//   "start_url": "/",
+//   "display": "standalone",
+//   "background_color": "#222222",
+//   "theme_color": "#1DB954",
+//   "scope": "/",
+//   "description": "Stream and enjoy music with SanketMusic app. Offline support included!",
+//   "icons": [
+//     {
+//       "src": "/icons/dslogo.png",
+//       "sizes": "192x192",
+//       "type": "image/png"
+//     },
+//     {
+//       "src": "/icons/dslogo.png",
+//       "sizes": "512x512",
+//       "type": "image/png"
+//     }
+//   ]
+// }
+
+
+////

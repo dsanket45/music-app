@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 import BottomNav from "../components/BottomNav";
 import Player from "../components/Player";
 import PlaylistModal from "../components/PlaylistModal";
+import BannerAd from "../components/Ads/BannerAd";
 import { Heart, Play, MoreVertical, PlusCircle, Trash2 } from 'lucide-react';
 
 const LikedSongsPage = () => {
@@ -105,6 +106,9 @@ const LikedSongsPage = () => {
             >
               Discover Music
             </button>
+             <div className="mb-8">
+      <BannerAd />
+    </div>
           </div>
         ) : (
           <>
@@ -118,6 +122,9 @@ const LikedSongsPage = () => {
                 <span className="hidden sm:inline">Play All</span>
               </button>
             </div>
+             <div className="mb-8">
+      <BannerAd />
+    </div>
 
             {/* Vertical List of Songs */}
             <div className="flex flex-col gap-4">
