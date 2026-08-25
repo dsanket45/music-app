@@ -9,7 +9,8 @@ import {
   onAuthStateChanged,
   signOut,
   setPersistence,
-  browserLocalPersistence
+  browserLocalPersistence,
+  signInAnonymously
 } from 'firebase/auth';
 
 export const AuthContext = createContext();
@@ -24,6 +25,26 @@ export const AuthProvider = ({ children }) => {
       console.warn('Could not set browserLocalPersistence:', err);
     });
   }, []);
+
+  const loginAsGuest = async () => {
+    setLoading(true);
+    try {
+      const result = await signInAnonymously(auth);
+      if (result?.user) {
+        setUser(result.user);
+      }
+    } catch (err) {
+      console.warn('Guest login fallback active:', err);
+      setUser({
+        uid: 'guest_' + Date.now(),
+        displayName: 'Guest Listener',
+        email: 'guest@dsmusics.app',
+        isAnonymous: true
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const login = async () => {
     setLoading(true);
@@ -102,7 +123,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, loginAsGuest, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

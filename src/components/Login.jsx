@@ -6,7 +6,7 @@ import dslogo from '../assets/dslogo.png';
 import { AiOutlineGoogle } from 'react-icons/ai';
 
 const Login = () => {
-  const { login, loading } = useContext(AuthContext);
+  const { login, loginAsGuest, loading } = useContext(AuthContext);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -46,7 +46,6 @@ const Login = () => {
         ))}
       </div>
 
-      {/* Scrollable Content Area (only if needed, but we avoid it) */}
       <div className="relative z-10 flex flex-col items-center justify-center flex-1 px-4 sm:px-6 pt-6 pb-6">
         {/* Logo & Branding */}
         <div
@@ -78,60 +77,60 @@ const Login = () => {
           <p className="text-gray-400 text-xs">Stream, discover, and enjoy unlimited music</p>
         </div>
 
-        {/* Features Cards - Reduced spacing & size */}
+        {/* Features Cards */}
         <div
-  className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl w-full px-4 sm:px-6 mb-6 sm:mb-10 transform transition-all duration-1000 ease-out ${
-    mounted ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
-  }`}
->
-  {features.map((feature, index) => {
-    const Icon = feature.icon;
-    return (
-      <div
-        key={index}
-        className="group relative bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10 hover:border-emerald-400/50 transition-all duration-500 hover:scale-[1.03] sm:hover:scale-[1.02] shadow-sm hover:shadow-lg hover:shadow-emerald-500/20"
-        style={{ animationDelay: `${index * 0.15}s` }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/0 to-teal-500/0 group-hover:from-emerald-500/10 group-hover:to-teal-500/10 rounded-2xl transition-all duration-500"></div>
-        <div
-          className={`relative w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br ${feature.color} rounded-lg flex items-center justify-center mb-3 shadow-md group-hover:scale-110 transition-transform duration-300`}
+          className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl w-full px-4 sm:px-6 mb-6 sm:mb-10 transform transition-all duration-1000 ease-out ${
+            mounted ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
+          }`}
         >
-          <Icon className="text-white" size={20} />
+          {features.map((feature, index) => {
+            const Icon = feature.icon;
+            return (
+              <div
+                key={index}
+                className="group relative bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10 hover:border-emerald-400/50 transition-all duration-500 hover:scale-[1.03] sm:hover:scale-[1.02] shadow-sm hover:shadow-lg hover:shadow-emerald-500/20"
+                style={{ animationDelay: `${index * 0.15}s` }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/0 to-teal-500/0 group-hover:from-emerald-500/10 group-hover:to-teal-500/10 rounded-2xl transition-all duration-500"></div>
+                <div
+                  className={`relative w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br ${feature.color} rounded-lg flex items-center justify-center mb-3 shadow-md group-hover:scale-110 transition-transform duration-300`}
+                >
+                  <Icon className="text-white" size={20} />
+                </div>
+                <p className="relative text-white text-sm sm:text-base font-semibold leading-tight">{feature.text}</p>
+              </div>
+            );
+          })}
         </div>
-        <p className="relative text-white text-sm sm:text-base font-semibold leading-tight">{feature.text}</p>
-      </div>
-    );
-  })}
-</div>
 
-        {/* Login Button */}
+        {/* Login Options Container */}
         <div
-          className={`transform transition-all duration-700 delay-300 ${
+          className={`flex flex-col items-center gap-3 transform transition-all duration-700 delay-300 w-full max-w-xs ${
             mounted ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'
           }`}
         >
+          {/* Instant Guest Access Button */}
+          <button
+            onClick={loginAsGuest}
+            disabled={loading}
+            className="w-full py-3 px-6 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-full font-bold text-sm transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2"
+          >
+            <Sparkles size={18} className="animate-spin-slow" />
+            <span>Instant Listen (Guest Access)</span>
+          </button>
+
+          {/* Google Sign In Button */}
           <button
             onClick={login}
             disabled={loading}
-            className="group relative px-5 py-2.5 sm:px-6 sm:py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full font-bold text-sm transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-500/40 overflow-hidden min-w-[200px]"
+            className="w-full py-3 px-6 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-full font-bold text-sm transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-            <div className="relative flex items-center justify-center gap-2">
-              {loading ? (
-                <>
-                  <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <span>Signing in...</span>
-                </>
-              ) : (
-                <>
-                  <AiOutlineGoogle size={18} className="text-white flex-shrink-0" />
-                  <span>Sign in with Google</span>
-                </>
-              )}
-            </div>
+            <AiOutlineGoogle size={18} className="text-white flex-shrink-0" />
+            <span>Sign in with Google</span>
           </button>
-          <p className="text-gray-400 text-xs text-center mt-2">
-            🔒 Secure authentication with Google
+
+          <p className="text-gray-400 text-xs text-center mt-1">
+            🔒 Secure & fast login options
           </p>
         </div>
       </div>
