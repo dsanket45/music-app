@@ -115,9 +115,9 @@ public class MainActivity extends BridgeActivity {
             intent.putExtra("thumbnail", thumbnail);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent);
+                MainActivity.this.startForegroundService(intent);
             } else {
-                startService(intent);
+                MainActivity.this.startService(intent);
             }
         }
 
@@ -125,21 +125,21 @@ public class MainActivity extends BridgeActivity {
         public void pauseService() {
             Intent intent = new Intent(MainActivity.this, MusicPlaybackService.class);
             intent.setAction(MusicPlaybackService.ACTION_PAUSE);
-            startService(intent);
+            MainActivity.this.startService(intent);
         }
 
         @JavascriptInterface
         public void resumeService() {
             Intent intent = new Intent(MainActivity.this, MusicPlaybackService.class);
             intent.setAction(MusicPlaybackService.ACTION_PLAY);
-            startService(intent);
+            MainActivity.this.startService(intent);
         }
 
         @JavascriptInterface
         public void stopService() {
             Intent intent = new Intent(MainActivity.this, MusicPlaybackService.class);
             intent.setAction(MusicPlaybackService.ACTION_STOP);
-            startService(intent);
+            MainActivity.this.startService(intent);
         }
 
         @JavascriptInterface
@@ -149,7 +149,7 @@ public class MainActivity extends BridgeActivity {
             intent.putExtra("title", title);
             intent.putExtra("artist", artist);
             intent.putExtra("thumbnail", thumbnail);
-            startService(intent);
+            MainActivity.this.startService(intent);
         }
     }
 }
