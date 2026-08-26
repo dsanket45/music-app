@@ -5,34 +5,6 @@
 [build.environment]
   SECRETS_SCAN_ENABLED = "false"
 
-[[redirects]]
-  from = "/dmusic-v104.apk"
-  to = "https://raw.githubusercontent.com/dsanket45/music-app/main/releases/dmusic.apk"
-  status = 302
-  force = true
-
-[[redirects]]
-  from = "/music-app.apk"
-  to = "https://raw.githubusercontent.com/dsanket45/music-app/main/releases/dmusic.apk"
-  status = 302
-  force = true
-
-[[redirects]]
-  from = "/dmusic.apk"
-  to = "https://raw.githubusercontent.com/dsanket45/music-app/main/releases/dmusic.apk"
-  status = 302
-  force = true
-
-[[redirects]]
-  from = "/__/auth/*"
-  to = "https://musicapp-b45de.firebaseapp.com/__/auth/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
 [[headers]]
   for = "/*"
   [headers.values]
@@ -44,3 +16,13 @@
     Content-Type = "application/vnd.android.package-archive"
     Content-Disposition = "attachment; filename=\"D-Music-App.apk\""
     Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[redirects]]
+  from = "/__/auth/*"
+  to = "https://musicapp-b45de.firebaseapp.com/__/auth/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

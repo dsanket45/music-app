@@ -146,7 +146,7 @@ const Dashboard = () => {
   };
 
   const handleDownloadApk = () => {
-    const apkUrl = `https://raw.githubusercontent.com/dsanket45/music-app/main/releases/dmusic.apk?v=${Date.now()}`;
+    const apkUrl = `${window.location.origin}/dmusic.apk?v=${Date.now()}`;
     const link = document.createElement("a");
     link.href = apkUrl;
     link.setAttribute("download", "D-Music-App.apk");
