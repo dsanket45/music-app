@@ -5,26 +5,20 @@
 [build.environment]
   SECRETS_SCAN_ENABLED = "false"
 
-[[headers]]
-  for = "/*"
-  [headers.values]
-    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
-
-[[headers]]
-  for = "/*.apk"
-  [headers.values]
-    Content-Type = "application/vnd.android.package-archive"
-    Content-Disposition = "attachment; filename=\"D-Music-App.apk\""
-    Cache-Control = "no-cache, no-store, must-revalidate"
-
 [[redirects]]
-  from = "/*.apk"
+  from = "/dmusic-v104.apk"
   to = "https://raw.githubusercontent.com/dsanket45/music-app/main/releases/dmusic.apk"
   status = 302
   force = true
 
 [[redirects]]
-  from = "/dmusic-v104.apk"
+  from = "/music-app.apk"
+  to = "https://raw.githubusercontent.com/dsanket45/music-app/main/releases/dmusic.apk"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/dmusic.apk"
   to = "https://raw.githubusercontent.com/dsanket45/music-app/main/releases/dmusic.apk"
   status = 302
   force = true
@@ -38,3 +32,15 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
+
+[[headers]]
+  for = "/*.apk"
+  [headers.values]
+    Content-Type = "application/vnd.android.package-archive"
+    Content-Disposition = "attachment; filename=\"D-Music-App.apk\""
+    Cache-Control = "no-cache, no-store, must-revalidate"
