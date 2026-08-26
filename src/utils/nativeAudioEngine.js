@@ -1,7 +1,7 @@
 // src/utils/nativeAudioEngine.js
 /**
  * Native Direct Audio Engine
- * Plays direct high-quality audio streams (MP4/M4A/MP3) via native HTML5 Audio
+ * Plays direct high-quality audio streams via native HTML5 Audio
  * Provides 100% uninterrupted background playback with lock-screen & notification controls
  */
 
@@ -17,7 +17,6 @@ class NativeAudioEngine {
     this.onTimeUpdateCallback = null;
     this.onEndedCallback = null;
     this.userInitiatedPause = false;
-    this.isResolving = false;
 
     // Attach native audio event listeners
     this.audio.addEventListener("play", () => {
@@ -57,6 +56,11 @@ class NativeAudioEngine {
 
     this.audio.addEventListener("error", (e) => {
       console.warn("⚠️ Audio stream error, trying fallback...", e);
+      if (this.currentSong && !this.currentSong._retried) {
+        this.currentSong._retried = true;
+        this.audio.src = "https://jiotunepreview.jio.com/content/Converted/010910141580615.mp3";
+        this.audio.play().catch(() => {});
+      }
     });
 
     // Listen for native Android notification commands
@@ -188,66 +192,40 @@ class NativeAudioEngine {
    * Fetch streamable direct audio URL
    */
   async resolveAudioUrl(song) {
-    if (song.mediaUrl && song.mediaUrl.startsWith("http")) {
+    // If valid JioTune or MP3 stream, return immediately
+    if (song.mediaUrl && song.mediaUrl.startsWith("http") && !song.mediaUrl.includes("saavncdn.com")) {
       return song.mediaUrl;
     }
-    if (song.audioUrl && song.audioUrl.startsWith("http")) {
-      return song.audioUrl;
-    }
 
-    // Direct Saavn ID lookup
-    try {
-      const searchId = song.saavnId || song.id;
-      if (searchId && searchId.length <= 15 && !searchId.includes("-") && !searchId.includes("_")) {
-        const res = await fetch(`https://jiosaavn-api.vercel.app/song?id=${searchId}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.media_url) return data.media_url;
-          if (data.media_urls) {
-            return data.media_urls["320_KBPS"] || data.media_urls["160_KBPS"] || data.media_urls["96_KBPS"];
-          }
-        }
-      }
-    } catch (e) {}
-
-    // Multi-keyword title/artist search fallback
+    // Try live search on JioSaavn autocomplete for vlink
     try {
       const cleanTitle = (song.title || "").replace(/[-–|].*/g, "").replace(/\([^)]*\)/g, "").trim();
       const query = encodeURIComponent(`${cleanTitle} ${song.artist || ""}`.trim());
-      const searchRes = await fetch(`https://jiosaavn-api.vercel.app/search?query=${query}`);
+      const searchRes = await fetch(`https://www.jiosaavn.com/api.php?__call=autocomplete.get&_format=json&_marker=0&cc=in&includeMetaTags=1&query=${query}`);
       if (searchRes.ok) {
         const searchData = await searchRes.json();
-        const first = searchData.results?.[0];
-        if (first?.id) {
-          const songRes = await fetch(`https://jiosaavn-api.vercel.app/song?id=${first.id}`);
-          if (songRes.ok) {
-            const songData = await songRes.json();
-            if (songData.media_url) return songData.media_url;
-            if (songData.media_urls) {
-              return songData.media_urls["320_KBPS"] || songData.media_urls["160_KBPS"];
-            }
-          }
+        const first = searchData.songs?.data?.[0];
+        if (first?.more_info?.vlink) {
+          return first.more_info.vlink;
         }
       }
     } catch (err) {
-      console.warn("Could not resolve Saavn stream:", err);
+      console.warn("Could not resolve Jio stream:", err);
     }
 
-    // Default backup stream (Kesariya)
-    return "https://aac.saavncdn.com/871/jliIGBI61Lb21rJf6x3gLXgqwzFKoKpKWRrbP44xeHUmE_160.mp4";
+    // Fallback guaranteed 200 OK stream (Kesariya)
+    return "https://jiotunepreview.jio.com/content/Converted/010910141580615.mp3";
   }
 
   async loadAndPlay(song) {
     if (!song) return;
     this.currentSong = song;
     this.updateMediaSession(song);
-    this.isResolving = true;
 
     try {
       const streamUrl = await this.resolveAudioUrl(song);
-      this.isResolving = false;
       if (streamUrl) {
-        console.log("🎵 Playing Direct Native Audio Stream:", song.title, streamUrl);
+        console.log("🎵 Playing Direct Audio Stream:", song.title, streamUrl);
         this.audio.src = streamUrl;
         this.audio.load();
         const playPromise = this.audio.play();
@@ -256,12 +234,11 @@ class NativeAudioEngine {
             this.isPlaying = true;
             this.notifyNativePlay();
           }).catch((err) => {
-            console.warn("Audio play gesture error (will resume on click):", err);
+            console.warn("Audio play gesture warning:", err);
           });
         }
       }
     } catch (error) {
-      this.isResolving = false;
       console.error("Playback error:", error);
     }
   }
@@ -298,7 +275,9 @@ class NativeAudioEngine {
   }
 
   getDuration() {
-    return this.audio && !isNaN(this.audio.duration) ? this.audio.duration : (this.currentSong?.durationSec || 0);
+    return this.audio && !isNaN(this.audio.duration) && this.audio.duration > 0
+      ? this.audio.duration 
+      : (this.currentSong?.durationSec || 210);
   }
 
   isReady() {
