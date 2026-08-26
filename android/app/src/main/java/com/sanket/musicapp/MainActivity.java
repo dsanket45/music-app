@@ -21,7 +21,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Keep screen on during active playback if needed
+        // Keep screen alive during active playback if needed
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         bridgeInterface = new AndroidBridge();
@@ -63,6 +63,7 @@ public class MainActivity extends BridgeActivity {
         super.onResume();
         setupWebViewSettings();
         if (this.bridge != null && this.bridge.getWebView() != null) {
+            this.bridge.getWebView().onResume();
             this.bridge.getWebView().resumeTimers();
         }
     }
@@ -98,8 +99,9 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onPause() {
         super.onPause();
-        // Keep WebView active for background audio playback
+        // Crucial: Keep WebView resumed so Android Chromium never pauses background media
         if (this.bridge != null && this.bridge.getWebView() != null) {
+            this.bridge.getWebView().onResume();
             this.bridge.getWebView().resumeTimers();
         }
     }
@@ -107,8 +109,9 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onStop() {
         super.onStop();
-        // Keep WebView active for background audio playback
+        // Crucial: Keep WebView resumed so Android Chromium never pauses background media
         if (this.bridge != null && this.bridge.getWebView() != null) {
+            this.bridge.getWebView().onResume();
             this.bridge.getWebView().resumeTimers();
         }
     }

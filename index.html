@@ -7,13 +7,17 @@
     <meta name="theme-color" content="#1DB954" />
     <link rel="icon" href="/icons/dslogo.png" />
     <script>
-      // Background audio keepalive guard: prevent YouTube iframe from pausing on screen lock or minimize
+      // Background audio keepalive guard: prevent YouTube iframe and audio from pausing on screen lock or minimize
       try {
         Object.defineProperty(document, 'hidden', { get: function() { return false; }, configurable: true });
         Object.defineProperty(document, 'visibilityState', { get: function() { return 'visible'; }, configurable: true });
         Object.defineProperty(document, 'webkitVisibilityState', { get: function() { return 'visible'; }, configurable: true });
       } catch(e) {}
-      window.addEventListener('visibilitychange', function(e) { e.stopImmediatePropagation(); }, true);
+
+      ['visibilitychange', 'webkitvisibilitychange', 'blur', 'pagehide', 'freeze'].forEach(function(evt) {
+        window.addEventListener(evt, function(e) { e.stopImmediatePropagation(); }, true);
+        document.addEventListener(evt, function(e) { e.stopImmediatePropagation(); }, true);
+      });
     </script>
     <script src="https://www.youtube.com/iframe_api"></script>
     <link rel="manifest" href="/manifest.webmanifest" />
