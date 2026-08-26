@@ -6,26 +6,32 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
-import android.webkit.WebResourceError;
-import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
     private BroadcastReceiver mediaCommandReceiver;
     private AndroidBridge bridgeInterface;
+    private PowerManager.WakeLock wakeLock;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Keep screen alive during active playback if needed
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        // Acquire a partial wake lock immediately — keeps CPU alive for audio even when screen is off
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        wakeLock = pm.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK | PowerManager.ON_AFTER_RELEASE,
+            "DMusic::BackgroundAudio"
+        );
+        wakeLock.acquire();
 
         bridgeInterface = new AndroidBridge();
 
@@ -58,20 +64,27 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onStart() {
         super.onStart();
-        setupWebViewSettings();
+        configureWebViewForBackground();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        setupWebViewSettings();
+        configureWebViewForBackground();
         if (this.bridge != null && this.bridge.getWebView() != null) {
             this.bridge.getWebView().onResume();
             this.bridge.getWebView().resumeTimers();
         }
     }
 
-    private void setupWebViewSettings() {
+    /**
+     * Configure the WebView to allow background media playback.
+     * Key settings:
+     *   - setMediaPlaybackRequiresUserGesture(false): allow autoplay
+     *   - MIXED_CONTENT_ALWAYS_ALLOW: allow HTTPS + HTTP resources
+     *   - JavaScript interface for native bridge
+     */
+    private void configureWebViewForBackground() {
         if (this.bridge != null && this.bridge.getWebView() != null) {
             WebView webView = this.bridge.getWebView();
             WebSettings settings = webView.getSettings();
@@ -83,7 +96,11 @@ public class MainActivity extends BridgeActivity {
             settings.setCacheMode(WebSettings.LOAD_DEFAULT);
 
             // Add JavaScript interface for native bridge communication
-            webView.addJavascriptInterface(bridgeInterface, "AndroidBridge");
+            try {
+                webView.addJavascriptInterface(bridgeInterface, "AndroidBridge");
+            } catch (Exception e) {
+                // Already added
+            }
         }
     }
 
@@ -94,6 +111,7 @@ public class MainActivity extends BridgeActivity {
             if (webView.canGoBack()) {
                 webView.goBack();
             } else {
+                // Don't finish the activity — move to background to keep playing
                 moveTaskToBack(true);
             }
         } else {
@@ -104,20 +122,48 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onPause() {
         super.onPause();
-        // Crucial: Keep WebView resumed so Android Chromium never pauses background media
-        if (this.bridge != null && this.bridge.getWebView() != null) {
-            this.bridge.getWebView().onResume();
-            this.bridge.getWebView().resumeTimers();
-        }
+        // CRITICAL: Force WebView to stay alive when app goes to background
+        keepWebViewAlive();
     }
 
     @Override
     public void onStop() {
         super.onStop();
-        // Crucial: Keep WebView resumed so Android Chromium never pauses background media
+        // CRITICAL: Force WebView to stay alive when screen is locked or other app is opened
+        keepWebViewAlive();
+    }
+
+    /**
+     * The nuclear option for background WebView media playback.
+     * Android Chromium will try to pause/suspend the WebView when the app loses focus.
+     * We counter this by:
+     * 1. Calling webView.onResume() to reverse the onPause()
+     * 2. Calling resumeTimers() to keep JavaScript timers running
+     * 3. Evaluating JavaScript to resume any paused AudioContext
+     */
+    private void keepWebViewAlive() {
         if (this.bridge != null && this.bridge.getWebView() != null) {
-            this.bridge.getWebView().onResume();
-            this.bridge.getWebView().resumeTimers();
+            WebView webView = this.bridge.getWebView();
+
+            // Reverse the WebView pause that Android just triggered
+            webView.onResume();
+            webView.resumeTimers();
+
+            // Resume AudioContext and YouTube player from JavaScript side
+            webView.evaluateJavascript(
+                "(function() {" +
+                "  try {" +
+                "    if (window._audioCtx && window._audioCtx.state === 'suspended') {" +
+                "      window._audioCtx.resume();" +
+                "    }" +
+                "    var iframes = document.querySelectorAll('iframe');" +
+                "    for (var i = 0; i < iframes.length; i++) {" +
+                "      try { iframes[i].contentWindow.postMessage('{\"event\":\"command\",\"func\":\"playVideo\",\"args\":\"\"}', '*'); } catch(e) {}" +
+                "    }" +
+                "  } catch(e) {}" +
+                "})();",
+                null
+            );
         }
     }
 
@@ -128,12 +174,16 @@ public class MainActivity extends BridgeActivity {
                 unregisterReceiver(mediaCommandReceiver);
             } catch (Exception e) {}
         }
+        if (wakeLock != null && wakeLock.isHeld()) {
+            try {
+                wakeLock.release();
+            } catch (Exception e) {}
+        }
         super.onDestroy();
     }
 
     /**
      * JavaScript interface exposed to the WebView as window.AndroidBridge
-     * Allows JS code to start/stop the foreground service and update metadata
      */
     public class AndroidBridge {
 
@@ -172,7 +222,11 @@ public class MainActivity extends BridgeActivity {
             Intent intent = new Intent(MainActivity.this, MusicPlaybackService.class);
             intent.setAction(MusicPlaybackService.ACTION_PLAY);
             try {
-                MainActivity.this.startService(intent);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    MainActivity.this.startForegroundService(intent);
+                } else {
+                    MainActivity.this.startService(intent);
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -200,6 +254,26 @@ public class MainActivity extends BridgeActivity {
                 MainActivity.this.startService(intent);
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+        }
+
+        /**
+         * Expose wake lock control to JavaScript so the service foreground
+         * can be started at the right time (when playback actually starts)
+         */
+        @JavascriptInterface
+        public void acquireWakeLock() {
+            if (wakeLock != null && !wakeLock.isHeld()) {
+                wakeLock.acquire();
+            }
+        }
+
+        @JavascriptInterface
+        public void releaseWakeLock() {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                try {
+                    wakeLock.release();
+                } catch (Exception e) {}
             }
         }
     }

@@ -8,6 +8,9 @@ import android.app.Service;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
@@ -37,6 +40,9 @@ public class MusicPlaybackService extends Service {
 
     private MediaSessionCompat mediaSession;
     private PowerManager.WakeLock wakeLock;
+    private PowerManager.WakeLock screenWakeLock;
+    private AudioManager audioManager;
+    private AudioFocusRequest audioFocusRequest;
     private boolean isPlaying = false;
 
     private String currentTitle = "D Music";
@@ -50,6 +56,10 @@ public class MusicPlaybackService extends Service {
         Log.d(TAG, "MusicPlaybackService created");
 
         createNotificationChannel();
+
+        // Acquire audio focus to prevent other apps from stealing audio
+        audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
+        requestAudioFocus();
 
         // Create MediaSession for lock-screen & notification controls
         mediaSession = new MediaSessionCompat(this, "DMusic");
@@ -65,7 +75,6 @@ public class MusicPlaybackService extends Service {
                 isPlaying = true;
                 updatePlaybackState();
                 updateNotification();
-                // Signal WebView to play
                 sendCommandToWebView("play");
             }
 
@@ -103,15 +112,69 @@ public class MusicPlaybackService extends Service {
         mediaSession.setActive(true);
         updatePlaybackState();
 
-        // Acquire partial wake lock to keep CPU alive for audio
+        // Acquire PARTIAL_WAKE_LOCK — keeps CPU alive for audio playback
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "DMusic::AudioWakeLock");
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "DMusic::ServiceWakeLock");
+        wakeLock.setReferenceCounted(false);
         wakeLock.acquire();
+
+        // Also acquire a WIFI lock to keep network alive for streaming
+        android.net.wifi.WifiManager wifiManager = (android.net.wifi.WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
+        if (wifiManager != null) {
+            android.net.wifi.WifiManager.WifiLock wifiLock = wifiManager.createWifiLock(
+                android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "DMusic::WifiLock"
+            );
+            wifiLock.acquire();
+        }
+    }
+
+    private void requestAudioFocus() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build();
+
+            audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(audioAttributes)
+                .setAcceptsDelayedFocusGain(true)
+                .setOnAudioFocusChangeListener(focusChange -> {
+                    switch (focusChange) {
+                        case AudioManager.AUDIOFOCUS_LOSS:
+                            // Another app took audio focus permanently
+                            sendCommandToWebView("pause");
+                            break;
+                        case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                            // Temporarily lost (phone call, etc)
+                            sendCommandToWebView("pause");
+                            break;
+                        case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                            // Can duck the volume
+                            break;
+                        case AudioManager.AUDIOFOCUS_GAIN:
+                            // Regained audio focus
+                            sendCommandToWebView("play");
+                            break;
+                    }
+                })
+                .build();
+
+            audioManager.requestAudioFocus(audioFocusRequest);
+        } else {
+            audioManager.requestAudioFocus(
+                focusChange -> {},
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            );
+        }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) {
+            // Service restarted by system — show a basic notification to stay alive
+            isPlaying = true;
+            startForeground(NOTIFICATION_ID, buildNotification());
             return START_STICKY;
         }
 
@@ -133,6 +196,7 @@ public class MusicPlaybackService extends Service {
                     loadThumbnailAsync(thumbnail);
                 }
                 updatePlaybackState();
+                updateMediaSessionMetadata();
                 startForeground(NOTIFICATION_ID, buildNotification());
                 break;
 
@@ -140,6 +204,7 @@ public class MusicPlaybackService extends Service {
                 isPlaying = false;
                 updatePlaybackState();
                 updateNotification();
+                // Don't stop foreground — keep the notification visible
                 break;
 
             case ACTION_NEXT:
@@ -172,7 +237,6 @@ public class MusicPlaybackService extends Service {
                 break;
 
             default:
-                // Initial start — show notification immediately
                 isPlaying = true;
                 updatePlaybackState();
                 startForeground(NOTIFICATION_ID, buildNotification());
@@ -201,14 +265,12 @@ public class MusicPlaybackService extends Service {
     }
 
     private Notification buildNotification() {
-        // Intent to open the app when notification is tapped
         Intent openAppIntent = new Intent(this, MainActivity.class);
         openAppIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent openAppPending = PendingIntent.getActivity(
             this, 0, openAppIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
-        // Media control intents
         PendingIntent prevPending = createActionPendingIntent(ACTION_PREV, 1);
         PendingIntent playPausePending = createActionPendingIntent(
             isPlaying ? ACTION_PAUSE : ACTION_PLAY, 2
@@ -222,7 +284,7 @@ public class MusicPlaybackService extends Service {
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(openAppPending)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setOngoing(isPlaying)
+            .setOngoing(true) // Always ongoing to prevent swipe-dismiss
             .setShowWhen(false)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setStyle(new androidx.media.app.NotificationCompat.MediaStyle()
@@ -263,9 +325,11 @@ public class MusicPlaybackService extends Service {
     private void updatePlaybackState() {
         long actions = PlaybackStateCompat.ACTION_PLAY |
                        PlaybackStateCompat.ACTION_PAUSE |
+                       PlaybackStateCompat.ACTION_PLAY_PAUSE |
                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT |
                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS |
-                       PlaybackStateCompat.ACTION_STOP;
+                       PlaybackStateCompat.ACTION_STOP |
+                       PlaybackStateCompat.ACTION_SEEK_TO;
 
         PlaybackStateCompat.Builder stateBuilder = new PlaybackStateCompat.Builder()
             .setActions(actions)
@@ -296,6 +360,8 @@ public class MusicPlaybackService extends Service {
             try {
                 HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
                 connection.setDoInput(true);
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(5000);
                 connection.connect();
                 InputStream input = connection.getInputStream();
                 Bitmap bitmap = BitmapFactory.decodeStream(input);
@@ -311,9 +377,9 @@ public class MusicPlaybackService extends Service {
     }
 
     private void sendCommandToWebView(String command) {
-        // Use a broadcast to communicate with MainActivity
         Intent broadcastIntent = new Intent("com.sanket.musicapp.MEDIA_COMMAND");
         broadcastIntent.putExtra("command", command);
+        broadcastIntent.setPackage(getPackageName());
         sendBroadcast(broadcastIntent);
     }
 
@@ -332,6 +398,17 @@ public class MusicPlaybackService extends Service {
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioFocusRequest != null) {
+            audioManager.abandonAudioFocusRequest(audioFocusRequest);
+        }
         super.onDestroy();
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        // When user swipes app from recents, keep service alive
+        Log.d(TAG, "Task removed — service stays alive");
+        // Do NOT call stopSelf() here
+        super.onTaskRemoved(rootIntent);
     }
 }

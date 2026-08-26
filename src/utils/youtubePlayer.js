@@ -16,6 +16,8 @@ class YouTubePlayerService {
     this.userInitiatedPause = false;
     this.timeUpdateTimer = null;
     this.audioContext = null;
+    this.bgResumeTimer = null;
+    this.serviceStarted = false;
 
     // Listen for native media commands from Android foreground service
     window.nativeMediaCommand = (command) => {
@@ -25,6 +27,7 @@ class YouTubePlayerService {
           this.playVideo();
           break;
         case 'pause':
+          this.userInitiatedPause = true;
           this.pauseVideo();
           break;
         case 'next':
@@ -41,20 +44,28 @@ class YouTubePlayerService {
     };
 
     this.startTimeTicker();
+    this.setupBackgroundGuard();
   }
 
+  /**
+   * Create an inaudible AudioContext oscillator that keeps the audio pipeline alive.
+   * This prevents Android from fully suspending audio when the WebView loses focus.
+   */
   startAudioKeepAlive() {
     try {
       if (!this.audioContext) {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (AudioCtx) {
           this.audioContext = new AudioCtx();
+          // Create a silent oscillator — keeps the audio thread alive
           const osc = this.audioContext.createOscillator();
           const gain = this.audioContext.createGain();
-          gain.gain.value = 0.0001; // inaudible
+          gain.gain.value = 0.00001; // completely inaudible
           osc.connect(gain);
           gain.connect(this.audioContext.destination);
           osc.start();
+          // Expose globally so native code can resume it
+          window._audioCtx = this.audioContext;
         }
       }
       if (this.audioContext && this.audioContext.state === 'suspended') {
@@ -63,6 +74,30 @@ class YouTubePlayerService {
     } catch (e) {
       console.warn("AudioContext keepalive init:", e);
     }
+  }
+
+  /**
+   * Background guard: periodically check if playback was interrupted
+   * by Android system and force-resume it.
+   */
+  setupBackgroundGuard() {
+    // Check every 2 seconds if we should be playing but aren't
+    this.bgResumeTimer = setInterval(() => {
+      if (this.isPlayingState && !this.userInitiatedPause && this.player) {
+        try {
+          const state = this.player.getPlayerState ? this.player.getPlayerState() : -1;
+          // YouTube states: -1=unstarted, 0=ended, 1=playing, 2=paused, 3=buffering, 5=cued
+          if (state === 2) { // Paused but should be playing
+            console.log('🔄 Background guard: resuming paused playback');
+            this.player.playVideo();
+          }
+          // Also resume AudioContext if suspended
+          if (this.audioContext && this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+          }
+        } catch (e) {}
+      }
+    }, 2000);
   }
 
   startTimeTicker() {
@@ -172,13 +207,24 @@ class YouTubePlayerService {
               this.updateMediaSessionPlaybackState("playing");
             } else if (event.data === 2) { // PAUSED
               if (!this.userInitiatedPause) {
-                // Background lock screen auto-resume
-                console.log("⚡ Auto-resuming background playback on screen lock/minimize...");
+                // System-initiated pause (background/lock screen) — force resume
+                console.log("⚡ System paused playback — auto-resuming...");
                 setTimeout(() => {
-                  if (this.player && typeof this.player.playVideo === 'function') {
+                  if (this.player && typeof this.player.playVideo === 'function' && !this.userInitiatedPause) {
                     this.player.playVideo();
                   }
-                }, 50);
+                }, 100);
+                // Also try again after a longer delay in case the first attempt fails
+                setTimeout(() => {
+                  if (this.player && typeof this.player.playVideo === 'function' && !this.userInitiatedPause) {
+                    this.player.playVideo();
+                  }
+                }, 500);
+                setTimeout(() => {
+                  if (this.player && typeof this.player.playVideo === 'function' && !this.userInitiatedPause) {
+                    this.player.playVideo();
+                  }
+                }, 1500);
               } else {
                 this.isPlayingState = false;
                 this.notifyNativePause();
@@ -209,6 +255,10 @@ class YouTubePlayerService {
     });
   }
 
+  /**
+   * Start the native Android foreground service when playback begins.
+   * This is what keeps the app process alive in the background.
+   */
   notifyNativePlay() {
     if (this.hasAndroidBridge() && this.currentSong) {
       try {
@@ -217,7 +267,11 @@ class YouTubePlayerService {
           this.currentSong.artist || 'Unknown Artist',
           this.currentSong.thumbnail || ''
         );
-      } catch (e) {}
+        this.serviceStarted = true;
+        console.log('🔔 Native foreground service started');
+      } catch (e) {
+        console.warn('Failed to start native service:', e);
+      }
     }
   }
 
@@ -244,7 +298,10 @@ class YouTubePlayerService {
   initMediaSession() {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.setActionHandler('play', () => this.playVideo());
-      navigator.mediaSession.setActionHandler('pause', () => this.pauseVideo());
+      navigator.mediaSession.setActionHandler('pause', () => {
+        this.userInitiatedPause = true;
+        this.pauseVideo();
+      });
       navigator.mediaSession.setActionHandler('previoustrack', () => {
         if (window.playerContext && window.playerContext.prevSong) {
           window.playerContext.prevSong();
@@ -313,6 +370,12 @@ class YouTubePlayerService {
     if (this.player && typeof this.player.playVideo === 'function') {
       this.player.playVideo();
     }
+    // Ensure foreground service is running
+    if (!this.serviceStarted && this.hasAndroidBridge() && this.currentSong) {
+      this.notifyNativePlay();
+    } else if (this.hasAndroidBridge()) {
+      try { window.AndroidBridge.resumeService(); } catch(e) {}
+    }
   }
 
   pauseVideo() {
@@ -321,6 +384,7 @@ class YouTubePlayerService {
     if (this.player && typeof this.player.pauseVideo === 'function') {
       this.player.pauseVideo();
     }
+    this.notifyNativePause();
   }
 
   play() {
@@ -378,6 +442,10 @@ class YouTubePlayerService {
     
     const videoId = song.songId || song.id;
     if (!videoId) return;
+
+    // Start the foreground service BEFORE loading the video
+    // This ensures Android keeps our process alive during loading
+    this.notifyNativePlay();
 
     await this.initialize();
     await this.waitForPlayerReady();
