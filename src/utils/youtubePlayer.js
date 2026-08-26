@@ -125,31 +125,27 @@ class YouTubePlayerService {
           onStateChange: (event) => {
             console.log("🎛️ YouTube Player State:", event.data);
 
-            // Auto-resume if YouTube paused while app is in background
-            if (event.data === 2 && document.hidden && this.isPlayingState) {
-              console.log("⚡ Background auto-resume...");
-              setTimeout(() => {
-                if (this.player && typeof this.player.playVideo === 'function') {
-                  this.player.playVideo();
-                }
-              }, 200);
-            }
-
             if (event.data === 1) {
               this.isPlayingState = true;
-              // Signal native service: playing
+              this.userInitiatedPause = false;
               this.notifyNativePlay();
             } else if (event.data === 2) {
-              if (!document.hidden) {
+              if (!this.userInitiatedPause) {
+                console.log("⚡ Auto-resuming background playback...");
+                setTimeout(() => {
+                  if (this.player && typeof this.player.playVideo === 'function') {
+                    this.player.playVideo();
+                  }
+                }, 50);
+              } else {
                 this.isPlayingState = false;
-              }
-              // Signal native service: paused (only if user actually paused)
-              if (!document.hidden) {
                 this.notifyNativePause();
               }
             } else if (event.data === 0) {
-              // Video ended — auto-play next
               this.isPlayingState = false;
+              if (window.playerContext && window.playerContext.nextSong) {
+                window.playerContext.nextSong();
+              }
             }
 
             if (this.onStateChangeCallback) {
@@ -319,6 +315,8 @@ class YouTubePlayerService {
 
   playVideo() {
     console.log("▶️ Play");
+    this.userInitiatedPause = false;
+    this.isPlayingState = true;
     if (this.player && typeof this.player.playVideo === 'function') {
       this.player.playVideo();
     }
@@ -326,6 +324,8 @@ class YouTubePlayerService {
 
   pauseVideo() {
     console.log("⏸️ Pause");
+    this.userInitiatedPause = true;
+    this.isPlayingState = false;
     if (this.player && typeof this.player.pauseVideo === 'function') {
       this.player.pauseVideo();
     }
