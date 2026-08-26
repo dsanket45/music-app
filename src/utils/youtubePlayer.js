@@ -1,34 +1,44 @@
 // src/utils/youtubePlayer.js
-class YouTubePlayerService {
+// Uses direct audio stream URLs via Piped API + HTML5 <audio> element
+// This enables TRUE background playback on Android (screen lock, app switch)
+
+const PIPED_INSTANCES = [
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.adminforge.de',
+  'https://pipedapi.in.projectsegfau.lt',
+  'https://api.piped.yt',
+  'https://pipedapi.darkness.services',
+];
+
+class AudioPlayerService {
   constructor() {
-    this.player = null;
-    this.apiReady = false;
-    this.playerReady = false;
+    this.audio = null;
     this.currentVideoId = null;
-    this.resolveReady = null;
-    this.apiLoadPromise = null;
-    this.onStateChangeCallback = null;
-    this.onTimeUpdateCallback = null;
-    this.onEndedCallback = null;
-    this.isInitializing = false;
     this.currentSong = null;
     this.isPlayingState = false;
     this.userInitiatedPause = false;
+    this.onStateChangeCallback = null;
+    this.onTimeUpdateCallback = null;
+    this.onEndedCallback = null;
     this.timeUpdateTimer = null;
-    this.audioContext = null;
-    this.bgResumeTimer = null;
     this.serviceStarted = false;
+    this.playerReady = true; // HTML5 audio is always ready
+    this.retryCount = 0;
+    this.maxRetries = 3;
+
+    // Create the HTML5 audio element
+    this.createAudioElement();
 
     // Listen for native media commands from Android foreground service
     window.nativeMediaCommand = (command) => {
       console.log('📱 Native media command received:', command);
       switch (command) {
         case 'play':
-          this.playVideo();
+          this.play();
           break;
         case 'pause':
           this.userInitiatedPause = true;
-          this.pauseVideo();
+          this.pause();
           break;
         case 'next':
           if (window.playerContext && window.playerContext.nextSong) {
@@ -44,72 +54,177 @@ class YouTubePlayerService {
     };
 
     this.startTimeTicker();
-    this.setupBackgroundGuard();
   }
 
-  /**
-   * Create an inaudible AudioContext oscillator that keeps the audio pipeline alive.
-   * This prevents Android from fully suspending audio when the WebView loses focus.
-   */
-  startAudioKeepAlive() {
-    try {
-      if (!this.audioContext) {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (AudioCtx) {
-          this.audioContext = new AudioCtx();
-          // Create a silent oscillator — keeps the audio thread alive
-          const osc = this.audioContext.createOscillator();
-          const gain = this.audioContext.createGain();
-          gain.gain.value = 0.00001; // completely inaudible
-          osc.connect(gain);
-          gain.connect(this.audioContext.destination);
-          osc.start();
-          // Expose globally so native code can resume it
-          window._audioCtx = this.audioContext;
+  createAudioElement() {
+    // Remove old audio element if exists
+    const existing = document.getElementById('dmusic-audio');
+    if (existing) existing.remove();
+
+    this.audio = new Audio();
+    this.audio.id = 'dmusic-audio';
+    this.audio.preload = 'auto';
+    this.audio.crossOrigin = 'anonymous';
+
+    // Handle playback events
+    this.audio.addEventListener('play', () => {
+      console.log('🎵 Audio playing');
+      this.isPlayingState = true;
+      this.userInitiatedPause = false;
+      this.notifyNativePlay();
+      this.updateMediaSessionPlaybackState('playing');
+      if (this.onStateChangeCallback) this.onStateChangeCallback(1); // 1 = playing
+    });
+
+    this.audio.addEventListener('pause', () => {
+      console.log('⏸️ Audio paused, userInitiated:', this.userInitiatedPause);
+      if (!this.userInitiatedPause) {
+        // System paused it (screen lock, etc) — force resume
+        console.log('⚡ System pause detected — auto-resuming...');
+        setTimeout(() => {
+          if (!this.userInitiatedPause && this.audio) {
+            this.audio.play().catch(e => console.warn('Auto-resume failed:', e));
+          }
+        }, 100);
+        setTimeout(() => {
+          if (!this.userInitiatedPause && this.audio) {
+            this.audio.play().catch(e => console.warn('Auto-resume retry failed:', e));
+          }
+        }, 500);
+        return;
+      }
+      this.isPlayingState = false;
+      this.notifyNativePause();
+      this.updateMediaSessionPlaybackState('paused');
+      if (this.onStateChangeCallback) this.onStateChangeCallback(2); // 2 = paused
+    });
+
+    this.audio.addEventListener('ended', () => {
+      console.log('⏹️ Audio ended');
+      this.isPlayingState = false;
+      if (this.onEndedCallback) {
+        this.onEndedCallback();
+      } else if (window.playerContext && window.playerContext.nextSong) {
+        window.playerContext.nextSong();
+      }
+      if (this.onStateChangeCallback) this.onStateChangeCallback(0); // 0 = ended
+    });
+
+    this.audio.addEventListener('error', (e) => {
+      console.error('❌ Audio error:', e);
+      // Try next Piped instance on error
+      if (this.retryCount < this.maxRetries && this.currentSong) {
+        this.retryCount++;
+        console.log(`🔄 Retrying with different instance (attempt ${this.retryCount}/${this.maxRetries})`);
+        this.loadStreamUrl(this.currentVideoId, this.retryCount);
+      } else {
+        // Skip to next song on persistent error
+        if (window.playerContext && window.playerContext.nextSong) {
+          window.playerContext.nextSong();
         }
       }
-      if (this.audioContext && this.audioContext.state === 'suspended') {
-        this.audioContext.resume();
-      }
-    } catch (e) {
-      console.warn("AudioContext keepalive init:", e);
-    }
+    });
+
+    this.audio.addEventListener('loadedmetadata', () => {
+      console.log('📊 Audio metadata loaded, duration:', this.audio.duration);
+    });
+
+    this.audio.addEventListener('canplay', () => {
+      console.log('✅ Audio can play');
+    });
   }
 
   /**
-   * Background guard: periodically check if playback was interrupted
-   * by Android system and force-resume it.
+   * Fetch the direct audio stream URL from Piped API
    */
-  setupBackgroundGuard() {
-    // Check every 2 seconds if we should be playing but aren't
-    this.bgResumeTimer = setInterval(() => {
-      if (this.isPlayingState && !this.userInitiatedPause && this.player) {
-        try {
-          const state = this.player.getPlayerState ? this.player.getPlayerState() : -1;
-          // YouTube states: -1=unstarted, 0=ended, 1=playing, 2=paused, 3=buffering, 5=cued
-          if (state === 2) { // Paused but should be playing
-            console.log('🔄 Background guard: resuming paused playback');
-            this.player.playVideo();
+  async getAudioStreamUrl(videoId, instanceIndex = 0) {
+    const errors = [];
+    
+    // Try each Piped instance in order
+    for (let i = instanceIndex; i < PIPED_INSTANCES.length; i++) {
+      const instance = PIPED_INSTANCES[i];
+      try {
+        console.log(`🌐 Trying Piped instance: ${instance}`);
+        const response = await fetch(`${instance}/streams/${videoId}`, {
+          signal: AbortSignal.timeout(8000)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Get the best audio-only stream
+        if (data.audioStreams && data.audioStreams.length > 0) {
+          // Sort by bitrate (highest first) and prefer opus/mp4a
+          const sorted = data.audioStreams
+            .filter(s => s.url && s.mimeType)
+            .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+          
+          // Prefer m4a/mp4 audio for better Android compatibility
+          const mp4Stream = sorted.find(s => 
+            s.mimeType.includes('audio/mp4') || s.mimeType.includes('audio/m4a')
+          );
+          const bestStream = mp4Stream || sorted[0];
+          
+          if (bestStream && bestStream.url) {
+            console.log(`✅ Got audio stream from ${instance}: ${bestStream.mimeType} @ ${bestStream.bitrate}bps`);
+            return {
+              url: bestStream.url,
+              duration: data.duration || 0,
+              title: data.title || '',
+              uploader: data.uploader || '',
+              thumbnail: data.thumbnailUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+            };
           }
-          // Also resume AudioContext if suspended
-          if (this.audioContext && this.audioContext.state === 'suspended') {
-            this.audioContext.resume();
-          }
-        } catch (e) {}
+        }
+        
+        throw new Error('No audio streams found');
+      } catch (err) {
+        console.warn(`❌ Piped instance ${instance} failed:`, err.message);
+        errors.push(`${instance}: ${err.message}`);
       }
-    }, 2000);
+    }
+    
+    throw new Error(`All Piped instances failed: ${errors.join(', ')}`);
+  }
+
+  async loadStreamUrl(videoId, startInstance = 0) {
+    try {
+      const streamData = await this.getAudioStreamUrl(videoId, startInstance);
+      
+      if (streamData && streamData.url) {
+        this.audio.src = streamData.url;
+        this.audio.load();
+        
+        const playPromise = this.audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(err => {
+            console.warn('Play failed, retrying:', err);
+            // Retry after a short delay
+            setTimeout(() => {
+              this.audio.play().catch(e => console.error('Play retry failed:', e));
+            }, 300);
+          });
+        }
+        
+        return streamData;
+      }
+    } catch (err) {
+      console.error('Failed to load stream:', err);
+      throw err;
+    }
   }
 
   startTimeTicker() {
     if (this.timeUpdateTimer) clearInterval(this.timeUpdateTimer);
     this.timeUpdateTimer = setInterval(() => {
-      if (this.isPlayingState && this.player && typeof this.player.getCurrentTime === 'function') {
-        try {
-          const t = this.player.getCurrentTime();
-          if (this.onTimeUpdateCallback && typeof t === 'number' && !isNaN(t)) {
-            this.onTimeUpdateCallback(t);
-          }
-        } catch (e) {}
+      if (this.isPlayingState && this.audio && !this.audio.paused) {
+        const t = this.audio.currentTime;
+        if (this.onTimeUpdateCallback && typeof t === 'number' && !isNaN(t)) {
+          this.onTimeUpdateCallback(t);
+        }
       }
     }, 250);
   }
@@ -122,143 +237,6 @@ class YouTubePlayerService {
     return typeof window.AndroidBridge !== 'undefined';
   }
 
-  loadYouTubeAPI() {
-    if (this.apiLoadPromise) return this.apiLoadPromise;
-
-    this.apiLoadPromise = new Promise((resolve) => {
-      if (window.YT && window.YT.Player) {
-        this.apiReady = true;
-        resolve();
-      } else {
-        const tag = document.createElement("script");
-        tag.src = "https://www.youtube.com/iframe_api";
-        document.body.appendChild(tag);
-
-        window.onYouTubeIframeAPIReady = () => {
-          this.apiReady = true;
-          resolve();
-        };
-      }
-    });
-
-    return this.apiLoadPromise;
-  }
-
-  async initialize() {
-    if (this.isInitializing) {
-      await this.waitForPlayerReady();
-      return;
-    }
-
-    this.isInitializing = true;
-    await this.loadYouTubeAPI();
-    
-    if (this.playerReady) {
-      this.isInitializing = false;
-      return;
-    }
-
-    const container = document.getElementById("youtube-player-container");
-    if (!container) {
-      console.error("YouTube player container not found");
-      this.isInitializing = false;
-      return;
-    }
-
-    return new Promise((resolve, reject) => {
-      this.player = new window.YT.Player("youtube-player-container", {
-        videoId: "",
-        playerVars: {
-          autoplay: 1,
-          controls: 0,
-          disablekb: 1,
-          fs: 0,
-          iv_load_policy: 3,
-          modestbranding: 1,
-          playsinline: 1,
-          rel: 0,
-          showinfo: 0,
-          enablejsapi: 1,
-          origin: window.location.origin,
-          widget_referrer: window.location.href,
-          mute: 0,
-        },
-        events: {
-          onReady: () => {
-            console.log("✅ YouTube Player Ready");
-            this.playerReady = true;
-            this.isInitializing = false;
-            this.initMediaSession();
-            
-            if (this.resolveReady) {
-              this.resolveReady();
-              this.resolveReady = null;
-            }
-            resolve();
-          },
-          onStateChange: (event) => {
-            console.log("🎛️ YouTube Player State:", event.data);
-
-            if (event.data === 1) { // PLAYING
-              this.isPlayingState = true;
-              this.userInitiatedPause = false;
-              this.startAudioKeepAlive();
-              this.notifyNativePlay();
-              this.updateMediaSessionPlaybackState("playing");
-            } else if (event.data === 2) { // PAUSED
-              if (!this.userInitiatedPause) {
-                // System-initiated pause (background/lock screen) — force resume
-                console.log("⚡ System paused playback — auto-resuming...");
-                setTimeout(() => {
-                  if (this.player && typeof this.player.playVideo === 'function' && !this.userInitiatedPause) {
-                    this.player.playVideo();
-                  }
-                }, 100);
-                // Also try again after a longer delay in case the first attempt fails
-                setTimeout(() => {
-                  if (this.player && typeof this.player.playVideo === 'function' && !this.userInitiatedPause) {
-                    this.player.playVideo();
-                  }
-                }, 500);
-                setTimeout(() => {
-                  if (this.player && typeof this.player.playVideo === 'function' && !this.userInitiatedPause) {
-                    this.player.playVideo();
-                  }
-                }, 1500);
-              } else {
-                this.isPlayingState = false;
-                this.notifyNativePause();
-                this.updateMediaSessionPlaybackState("paused");
-              }
-            } else if (event.data === 0) { // ENDED
-              this.isPlayingState = false;
-              if (this.onEndedCallback) {
-                this.onEndedCallback();
-              } else if (window.playerContext && window.playerContext.nextSong) {
-                window.playerContext.nextSong();
-              }
-            }
-
-            if (this.onStateChangeCallback) {
-              this.onStateChangeCallback(event.data);
-            }
-          },
-          onError: (error) => {
-            console.error("❌ YouTube Player Error:", error);
-            this.isInitializing = false;
-            if (window.playerContext && window.playerContext.nextSong) {
-              window.playerContext.nextSong();
-            }
-          },
-        },
-      });
-    });
-  }
-
-  /**
-   * Start the native Android foreground service when playback begins.
-   * This is what keeps the app process alive in the background.
-   */
   notifyNativePlay() {
     if (this.hasAndroidBridge() && this.currentSong) {
       try {
@@ -297,10 +275,10 @@ class YouTubePlayerService {
 
   initMediaSession() {
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.setActionHandler('play', () => this.playVideo());
+      navigator.mediaSession.setActionHandler('play', () => this.play());
       navigator.mediaSession.setActionHandler('pause', () => {
         this.userInitiatedPause = true;
-        this.pauseVideo();
+        this.pause();
       });
       navigator.mediaSession.setActionHandler('previoustrack', () => {
         if (window.playerContext && window.playerContext.prevSong) {
@@ -356,66 +334,66 @@ class YouTubePlayerService {
     }
   }
 
+  // Compatibility methods (same API as before)
+  async initialize() {
+    this.initMediaSession();
+  }
+
   waitForPlayerReady() {
-    if (this.playerReady) return Promise.resolve();
-    return new Promise((resolve) => {
-      this.resolveReady = resolve;
-    });
+    return Promise.resolve();
   }
 
   playVideo() {
-    this.userInitiatedPause = false;
-    this.isPlayingState = true;
-    this.startAudioKeepAlive();
-    if (this.player && typeof this.player.playVideo === 'function') {
-      this.player.playVideo();
-    }
-    // Ensure foreground service is running
-    if (!this.serviceStarted && this.hasAndroidBridge() && this.currentSong) {
-      this.notifyNativePlay();
-    } else if (this.hasAndroidBridge()) {
-      try { window.AndroidBridge.resumeService(); } catch(e) {}
-    }
+    this.play();
   }
 
   pauseVideo() {
     this.userInitiatedPause = true;
+    this.pause();
+  }
+
+  play() {
+    this.userInitiatedPause = false;
+    this.isPlayingState = true;
+    if (this.audio) {
+      const p = this.audio.play();
+      if (p) p.catch(e => console.warn('Play error:', e));
+    }
+    // Ensure foreground service is running
+    if (this.hasAndroidBridge() && this.currentSong) {
+      try { window.AndroidBridge.resumeService(); } catch(e) {}
+    }
+  }
+
+  pause() {
+    this.userInitiatedPause = true;
     this.isPlayingState = false;
-    if (this.player && typeof this.player.pauseVideo === 'function') {
-      this.player.pauseVideo();
+    if (this.audio) {
+      this.audio.pause();
     }
     this.notifyNativePause();
   }
 
-  play() {
-    this.playVideo();
-  }
-
-  pause() {
-    this.pauseVideo();
-  }
-
   seekTo(seconds) {
-    if (this.player && typeof this.player.seekTo === 'function') {
-      this.player.seekTo(seconds, true);
+    if (this.audio) {
+      this.audio.currentTime = seconds;
     }
   }
 
   setVolume(volume) {
-    if (this.player && typeof this.player.setVolume === 'function') {
-      this.player.setVolume(volume);
+    if (this.audio) {
+      // Volume: 0-100 from UI, audio element wants 0-1
+      this.audio.volume = Math.max(0, Math.min(1, volume / 100));
     }
   }
 
   getCurrentTime() {
-    return this.player && typeof this.player.getCurrentTime === 'function'
-      ? this.player.getCurrentTime()
-      : 0;
+    return this.audio ? this.audio.currentTime || 0 : 0;
   }
 
   getDuration() {
-    const dur = this.player && typeof this.player.getDuration === 'function' ? this.player.getDuration() : 0;
-    return dur > 0 ? dur : (this.currentSong?.durationSec || 210);
+    const dur = this.audio ? this.audio.duration : 0;
+    return (dur && !isNaN(dur) && dur > 0) ? dur : (this.currentSong?.durationSec || 210);
   }
 
   onStateChange(callback) {
@@ -431,37 +409,43 @@ class YouTubePlayerService {
   }
 
   isReady() {
-    return this.playerReady;
+    return true;
   }
 
   async loadAndPlay(song) {
     if (!song) return;
     this.currentSong = song;
+    this.retryCount = 0;
     this.updateMediaSession(song);
-    this.startAudioKeepAlive();
     
     const videoId = song.songId || song.id;
     if (!videoId) return;
 
-    // Start the foreground service BEFORE loading the video
-    // This ensures Android keeps our process alive during loading
+    console.log('🎯 Loading direct audio stream for:', song.title, '(', videoId, ')');
+
+    // Start the foreground service BEFORE loading audio
     this.notifyNativePlay();
 
-    await this.initialize();
-    await this.waitForPlayerReady();
+    // Stop current playback
+    if (this.audio) {
+      this.audio.pause();
+      this.audio.currentTime = 0;
+    }
 
-    if (this.currentVideoId !== videoId) {
-      this.currentVideoId = videoId;
-      this.player.loadVideoById({
-        videoId: videoId,
-        startSeconds: 0
-      });
-      this.playVideo();
-    } else {
-      this.playVideo();
+    try {
+      const streamData = await this.loadStreamUrl(videoId);
+      console.log('✅ Audio stream loaded successfully');
+    } catch (err) {
+      console.error('❌ All stream sources failed:', err);
+      // Skip to next song
+      setTimeout(() => {
+        if (window.playerContext && window.playerContext.nextSong) {
+          window.playerContext.nextSong();
+        }
+      }, 1000);
     }
   }
 }
 
-export const youtubePlayer = new YouTubePlayerService();
+export const youtubePlayer = new AudioPlayerService();
 export const nativeAudioEngine = youtubePlayer;

@@ -6,27 +6,12 @@
     <title>D S Musics</title>
     <meta name="theme-color" content="#1DB954" />
     <link rel="icon" href="/icons/dslogo.png" />
-    <script>
-      // Background audio keepalive guard: prevent YouTube iframe and audio from pausing on screen lock or minimize
-      try {
-        Object.defineProperty(document, 'hidden', { get: function() { return false; }, configurable: true });
-        Object.defineProperty(document, 'visibilityState', { get: function() { return 'visible'; }, configurable: true });
-        Object.defineProperty(document, 'webkitVisibilityState', { get: function() { return 'visible'; }, configurable: true });
-      } catch(e) {}
-
-      ['visibilitychange', 'webkitvisibilitychange', 'blur', 'pagehide', 'freeze'].forEach(function(evt) {
-        window.addEventListener(evt, function(e) { e.stopImmediatePropagation(); }, true);
-        document.addEventListener(evt, function(e) { e.stopImmediatePropagation(); }, true);
-      });
-    </script>
-    <script src="https://www.youtube.com/iframe_api"></script>
     <link rel="manifest" href="/manifest.webmanifest" />
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2286575716043591"
      crossorigin="anonymous"></script>
   </head>
   <body class="bg-[#0a0f1d] text-white">
     <div id="root"></div>
-    <div id="youtube-player-container" style="position:fixed;left:-9999px;bottom:0;width:200px;height:200px;opacity:0.01;pointer-events:none;z-index:-999;"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
