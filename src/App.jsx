@@ -16,14 +16,11 @@ import LottieLoader from './components/LottieLoader';
 import { Sparkles, RefreshCw } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
 
-const CURRENT_VERSION_TIMESTAMP = 1724598500000;
-
 function App() {
   const { user, loading } = useContext(AuthContext);
   const location = useLocation();
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [swRegistration, setSwRegistration] = useState(null);
-  const [latestVersionData, setLatestVersionData] = useState(null);
 
   // ✅ Redirect root path
   useEffect(() => {
@@ -45,7 +42,7 @@ function App() {
           }
         });
       } catch (err) {
-        console.warn('Capacitor App backButton listener error:', err);
+        // Not running in Capacitor native — ignore
       }
     };
     setupBackButton();
@@ -55,54 +52,13 @@ function App() {
     };
   }, [location.pathname]);
 
-  // Instant server version check on app launch (works on Web, APK, Login page, Dashboard)
-  useEffect(() => {
-    const checkServerVersion = async () => {
-      try {
-        const response = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' });
-        if (response.ok) {
-          const data = await response.json();
-          const localTimestamp = Number(localStorage.getItem('app_installed_timestamp')) || CURRENT_VERSION_TIMESTAMP;
-          if (data.timestamp && data.timestamp > localTimestamp) {
-            console.log('🚀 Server version is newer:', data);
-            setLatestVersionData(data);
-            setUpdateAvailable(true);
-            const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
-            if (isNative) {
-              console.log('📱 Native App: Auto-applying Over-The-Air live update...');
-              localStorage.setItem('app_installed_timestamp', data.timestamp.toString());
-              window.location.reload(true);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Version check error:', err);
-      }
-    };
-
-    checkServerVersion();
-
-    // Check version whenever user switches focus back to the app
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        checkServerVersion();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, []);
-
-  // Enhanced service worker & auto update checking
+  // ✅ Service worker registration (non-aggressive — no auto-reload)
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
         .then(registration => {
           setSwRegistration(registration);
           registration.update().catch(() => {});
-
-          navigator.serviceWorker.addEventListener('controllerchange', () => {
-            window.location.reload();
-          });
 
           if (registration.waiting) {
             setUpdateAvailable(true);
@@ -124,52 +80,35 @@ function App() {
   }, []);
 
   const handleApplyUpdate = () => {
-    if (latestVersionData?.timestamp) {
-      localStorage.setItem('app_installed_timestamp', latestVersionData.timestamp.toString());
-    } else {
-      localStorage.setItem('app_installed_timestamp', Date.now().toString());
-    }
-
     if (swRegistration && swRegistration.waiting) {
       swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
     }
     window.location.reload(true);
   };
 
-  // Render Update Modal component so it works over loading screen & routes
-  const renderUpdateModal = () => {
+  // Render non-intrusive update banner
+  const renderUpdateBanner = () => {
     if (!updateAvailable) return null;
     return (
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
-        <div className="bg-slate-900 border border-emerald-500/50 text-white rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center relative overflow-hidden">
-          <div className="absolute -top-12 -right-12 w-28 h-28 bg-emerald-500/20 rounded-full blur-xl pointer-events-none"></div>
-
-          <div className="w-16 h-16 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/30 text-white animate-bounce-short">
-            <Sparkles className="w-8 h-8" />
-          </div>
-
-          <h3 className="text-xl font-bold mb-1 flex items-center justify-center gap-2">
-            New Update Available! 🎉
-          </h3>
-          <p className="text-xs text-slate-300 mb-5 leading-relaxed">
-            A fresh update for <strong>D S Musics</strong> is available! Tap below to update and load the latest features instantly.
-          </p>
-
-          <button
-            onClick={handleApplyUpdate}
-            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold py-3.5 px-5 rounded-2xl shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm"
-          >
-            <RefreshCw className="w-4 h-4 animate-spin" />
-            Update App Now
-          </button>
+      <div className="fixed top-0 left-0 right-0 z-[9999] p-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between shadow-lg">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4" />
+          <span className="text-sm font-medium">Update available</span>
         </div>
+        <button
+          onClick={handleApplyUpdate}
+          className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-bold py-1.5 px-3 rounded-full transition-all active:scale-95"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Update
+        </button>
       </div>
     );
   };
 
   return (
     <>
-      {renderUpdateModal()}
+      {renderUpdateBanner()}
       <InstallPrompt />
 
       {loading ? (
@@ -183,10 +122,9 @@ function App() {
           <Route path="/playlists" element={user ? <PlaylistPage /> : <Navigate to="/login" replace />} />
           <Route path="/settings" element={user ? <SettingsPage /> : <Navigate to="/login" replace />} />
           <Route path="/about" element={user ? <AboutMe /> : <Navigate to="/login" replace />} />
-          <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
-
           <Route path="/contact" element={user ? <ContactPage /> : <Navigate to="/login" replace />} />
           <Route path="/privacy" element={user ? <PrivacyPolicyPage /> : <Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
         </Routes>
       )}
     </>
