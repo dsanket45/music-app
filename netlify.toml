@@ -18,6 +18,18 @@
     Cache-Control = "no-cache, no-store, must-revalidate"
 
 [[redirects]]
+  from = "/*.apk"
+  to = "https://raw.githubusercontent.com/dsanket45/music-app/main/releases/dmusic.apk"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/dmusic-v104.apk"
+  to = "https://raw.githubusercontent.com/dsanket45/music-app/main/releases/dmusic.apk"
+  status = 302
+  force = true
+
+[[redirects]]
   from = "/__/auth/*"
   to = "https://musicapp-b45de.firebaseapp.com/__/auth/:splat"
   status = 200
