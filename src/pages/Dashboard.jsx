@@ -6,18 +6,17 @@ import { getTrendingIndianMusic, searchYouTube } from "../utils/search.js";
 import BottomNav from "../components/BottomNav.jsx";
 import Player from "../components/Player.jsx";
 import SongCard from "../components/SongCard.jsx";
-import { Heart, Sparkles, Play, Flame, Music, Radio, LogOut } from 'lucide-react';
+import { Heart, Sparkles, Play, Flame, Music, Radio, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
-  const { user, logout } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const { setNewQueue } = useContext(PlayerContext);
   const navigate = useNavigate();
 
   const [trendingSongs, setTrendingSongs] = useState([]);
   const [romanticSongs, setRomanticSongs] = useState([]);
   const [partySongs, setPartySongs] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   // Time-based greeting
   const timeGreeting = useMemo(() => {
@@ -29,21 +28,15 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchMusic = async () => {
-      setIsLoading(true);
       try {
-        const [trending, romantic, party] = await Promise.all([
-          getTrendingIndianMusic(),
-          searchYouTube("Arijit Singh romantic hits"),
-          searchYouTube("party dance songs")
-        ]);
+        const trending = await getTrendingIndianMusic();
+        setTrendingSongs(trending);
 
-        setTrendingSongs(trending.slice(0, 10));
-        setRomanticSongs(romantic.slice(0, 10));
-        setPartySongs(party.slice(0, 10));
+        // Fetch other sections in background
+        searchYouTube("romantic love songs").then(res => setRomanticSongs(res.slice(0, 10)));
+        searchYouTube("party dance songs").then(res => setPartySongs(res.slice(0, 10)));
       } catch (e) {
         console.error("Dashboard fetch error:", e);
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -77,12 +70,12 @@ const Dashboard = () => {
       action: () => partySongs[0] && setNewQueue(partySongs, 0)
     },
     {
-      title: "Top English Hits",
+      title: "Arijit Singh Hits",
       icon: Sparkles,
       gradient: "from-amber-600 to-yellow-400",
       action: async () => {
-        const eng = await searchYouTube("Top global hits");
-        setNewQueue(eng, 0);
+        const res = await searchYouTube("Arijit Singh");
+        setNewQueue(res, 0);
       }
     },
     {
@@ -93,22 +86,29 @@ const Dashboard = () => {
     }
   ];
 
+  const userName = user?.displayName || user?.email?.split('@')[0] || 'Listener';
+
   return (
     <div className="min-h-screen bg-[#121212] text-white flex flex-col pb-36 font-sans">
       {/* Top Header */}
-      <header className="sticky top-0 z-30 bg-[#121212]/90 backdrop-blur-md px-6 py-4 flex items-center justify-between">
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-          {timeGreeting}
-        </h1>
+      <header className="sticky top-0 z-30 bg-[#121212]/95 backdrop-blur-md px-4 sm:px-6 py-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            {timeGreeting}
+          </h1>
+          <p className="text-xs text-[#B3B3B3] font-medium mt-0.5">
+            Welcome back, {userName}
+          </p>
+        </div>
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => logout()}
-            className="p-2 rounded-full bg-[#181818] hover:bg-[#282828] text-[#B3B3B3] hover:text-white transition-colors"
-            title="Logout"
-            aria-label="Logout"
+            onClick={() => navigate('/settings')}
+            className="p-2.5 rounded-full bg-[#181818] hover:bg-[#282828] text-white transition-colors border border-[#282828]"
+            title="Settings & Account"
+            aria-label="Settings"
           >
-            <LogOut size={18} />
+            <Settings size={20} />
           </button>
         </div>
       </header>
@@ -157,34 +157,38 @@ const Dashboard = () => {
         </section>
 
         {/* Section 2: Romantic Melodies */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-              Romantic Melodies
-            </h2>
-          </div>
+        {romanticSongs.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                Romantic Melodies
+              </h2>
+            </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {romanticSongs.map((song) => (
-              <SongCard key={song.songId || song.id} song={song} />
-            ))}
-          </div>
-        </section>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {romanticSongs.map((song) => (
+                <SongCard key={song.songId || song.id} song={song} />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Section 3: Party & Dance Hits */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-              Party & Dance Hits
-            </h2>
-          </div>
+        {partySongs.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                Party & Dance Hits
+              </h2>
+            </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {partySongs.map((song) => (
-              <SongCard key={song.songId || song.id} song={song} />
-            ))}
-          </div>
-        </section>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {partySongs.map((song) => (
+                <SongCard key={song.songId || song.id} song={song} />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       {/* Spotify Bottom Mini Player */}

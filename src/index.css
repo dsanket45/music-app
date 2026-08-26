@@ -23,14 +23,18 @@
   }
 
   html, body {
-    background-color: #121212 !important;
-    color: #FFFFFF !important;
+    background-color: #121212;
+    color: #FFFFFF;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     overscroll-behavior-y: contain;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     margin: 0;
     padding: 0;
+  }
+
+  input, textarea, select {
+    color-scheme: dark;
   }
 }
 
@@ -52,41 +56,19 @@
 
 /* Spotify glass and blur helpers */
 .spotify-nav {
-  background: linear-gradient(180deg, rgba(18,18,18,0.98) 0%, rgba(18,18,18,0.92) 100%);
+  background: rgba(18, 18, 18, 0.95);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
 
 .spotify-card {
   background-color: #181818;
-  transition: background-color 0.3s ease, transform 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 .spotify-card:hover {
   background-color: #282828;
 }
 
-/* Spotify Green Glow */
 .spotify-glow {
-  box-shadow: 0 8px 24px rgba(29, 185, 84, 0.4);
-}
-
-/* Universal Spotify Dark Mode Overrides */
-.bg-white, .dark\:bg-gray-900, .dark\:bg-slate-900, .bg-gray-900, .bg-slate-900 {
-  background-color: #121212 !important;
-}
-
-.bg-gray-50, .bg-slate-50, .dark\:bg-gray-800, .dark\:bg-slate-800, .bg-gray-800, .bg-slate-800 {
-  background-color: #181818 !important;
-}
-
-.text-gray-900, .text-slate-900, .dark\:text-white {
-  color: #FFFFFF !important;
-}
-
-.text-gray-600, .text-gray-500, .text-gray-400, .text-slate-400, .text-slate-500 {
-  color: #B3B3B3 !important;
-}
-
-.border-gray-200, .border-slate-200, .dark\:border-gray-800, .dark\:border-slate-800 {
-  border-color: #282828 !important;
+  box-shadow: 0 8px 24px rgba(29, 185, 84, 0.35);
 }

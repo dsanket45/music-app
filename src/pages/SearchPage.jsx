@@ -14,63 +14,65 @@ const SearchPage = () => {
   const [loading, setLoading] = useState(false);
 
   const categories = [
-    { title: "Pop", color: "bg-pink-600", q: "top pop songs" },
-    { title: "Bollywood", color: "bg-emerald-600", q: "latest bollywood hits" },
-    { title: "Romantic", color: "bg-red-600", q: "best romantic songs" },
-    { title: "Party & Dance", color: "bg-purple-600", q: "party dance songs" },
-    { title: "Punjabi Hits", color: "bg-amber-600", q: "top punjabi songs" },
-    { title: "Tamil / Telugu", color: "bg-blue-600", q: "south indian top hits" },
-    { title: "Hip-Hop", color: "bg-orange-600", q: "hip hop hits" },
-    { title: "Chill & Acoustic", color: "bg-teal-600", q: "chill acoustic songs" },
+    { title: "Bollywood Hits", color: "bg-emerald-700", q: "bollywood hits" },
+    { title: "Romantic Melodies", color: "bg-rose-700", q: "romantic love songs" },
+    { title: "Party & Dance", color: "bg-purple-700", q: "party dance" },
+    { title: "Telugu / Tamil", color: "bg-blue-700", q: "telugu tamil top songs" },
+    { title: "Punjabi Beats", color: "bg-amber-700", q: "punjabi top hits" },
+    { title: "Arijit Singh", color: "bg-teal-700", q: "Arijit Singh" },
+    { title: "Global Top 50", color: "bg-indigo-700", q: "top global hits" },
+    { title: "Chill & Acoustic", color: "bg-cyan-800", q: "chill acoustic" },
   ];
 
-  const handleSearch = async (searchQuery) => {
-    if (!searchQuery || !searchQuery.trim()) return;
-    setLoading(true);
-    try {
-      const data = await searchYouTube(searchQuery);
-      setResults(data);
-    } catch (e) {
-      console.error("Search error:", e);
-    } finally {
+  // Auto search on debounced query
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
       setLoading(false);
+      return;
     }
-  };
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
-      handleSearch(query);
-    }
-  };
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const data = await searchYouTube(query);
+        setResults(data);
+      } catch (e) {
+        console.error("Search error:", e);
+      } finally {
+        setLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const handleCategoryClick = (catQuery) => {
     setQuery(catQuery);
-    handleSearch(catQuery);
   };
 
   return (
     <div className="min-h-screen bg-[#121212] text-white flex flex-col pb-36 font-sans">
-      {/* Top Header & Search Bar */}
-      <header className="sticky top-0 z-30 bg-[#121212]/90 backdrop-blur-md px-4 sm:px-6 py-4 space-y-3">
+      {/* Search Header */}
+      <header className="sticky top-0 z-30 bg-[#121212]/95 backdrop-blur-md px-4 sm:px-6 py-4 space-y-3">
         <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
           Search
         </h1>
 
-        {/* Spotify Search Bar */}
+        {/* High-Contrast Search Input */}
         <div className="relative w-full max-w-2xl">
-          <Search size={20} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black" />
+          <Search size={20} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#B3B3B3]" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
             placeholder="What do you want to listen to?"
-            className="w-full h-12 pl-11 pr-10 rounded-full bg-white text-black text-sm sm:text-base font-medium placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-white shadow-md"
+            className="w-full h-12 pl-11 pr-10 rounded-full bg-[#242424] text-white text-sm sm:text-base font-medium placeholder-[#B3B3B3] focus:outline-none focus:ring-2 focus:ring-white border border-[#333333] transition-all shadow-inner"
           />
           {query && (
             <button
               onClick={() => { setQuery(""); setResults([]); }}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-black hover:opacity-70"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#B3B3B3] hover:text-white"
             >
               <X size={18} />
             </button>
@@ -79,11 +81,11 @@ const SearchPage = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 px-4 sm:px-6 max-w-7xl mx-auto w-full pt-4">
+      <main className="flex-1 px-4 sm:px-6 max-w-7xl mx-auto w-full pt-2">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 size={36} className="animate-spin text-[#1DB954]" />
-            <p className="text-sm text-[#B3B3B3] mt-3 font-medium">Searching songs...</p>
+            <Loader2 size={32} className="animate-spin text-[#1DB954]" />
+            <p className="text-sm text-[#B3B3B3] mt-3 font-medium">Searching music...</p>
           </div>
         ) : results.length > 0 ? (
           <div className="space-y-4">
@@ -102,7 +104,7 @@ const SearchPage = () => {
                 <div
                   key={idx}
                   onClick={() => handleCategoryClick(cat.q)}
-                  className={`relative ${cat.color} aspect-[1.3] rounded-lg p-3 sm:p-4 overflow-hidden cursor-pointer hover:scale-105 transition-transform shadow-md flex items-start justify-between`}
+                  className={`relative ${cat.color} aspect-[1.3] rounded-lg p-4 overflow-hidden cursor-pointer hover:scale-105 transition-transform shadow-md flex items-start justify-between`}
                 >
                   <span className="text-base sm:text-lg font-black text-white leading-tight">
                     {cat.title}
