@@ -15,6 +15,7 @@ class YouTubePlayerService {
     this.isPlayingState = false;
     this.userInitiatedPause = false;
     this.timeUpdateTimer = null;
+    this.audioContext = null;
 
     // Listen for native media commands from Android foreground service
     window.nativeMediaCommand = (command) => {
@@ -40,6 +41,28 @@ class YouTubePlayerService {
     };
 
     this.startTimeTicker();
+  }
+
+  startAudioKeepAlive() {
+    try {
+      if (!this.audioContext) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          this.audioContext = new AudioCtx();
+          const osc = this.audioContext.createOscillator();
+          const gain = this.audioContext.createGain();
+          gain.gain.value = 0.0001; // inaudible
+          osc.connect(gain);
+          gain.connect(this.audioContext.destination);
+          osc.start();
+        }
+      }
+      if (this.audioContext && this.audioContext.state === 'suspended') {
+        this.audioContext.resume();
+      }
+    } catch (e) {
+      console.warn("AudioContext keepalive init:", e);
+    }
   }
 
   startTimeTicker() {
@@ -144,12 +167,23 @@ class YouTubePlayerService {
             if (event.data === 1) { // PLAYING
               this.isPlayingState = true;
               this.userInitiatedPause = false;
+              this.startAudioKeepAlive();
               this.notifyNativePlay();
               this.updateMediaSessionPlaybackState("playing");
             } else if (event.data === 2) { // PAUSED
-              this.isPlayingState = false;
-              this.notifyNativePause();
-              this.updateMediaSessionPlaybackState("paused");
+              if (!this.userInitiatedPause) {
+                // Background lock screen auto-resume
+                console.log("⚡ Auto-resuming background playback on screen lock/minimize...");
+                setTimeout(() => {
+                  if (this.player && typeof this.player.playVideo === 'function') {
+                    this.player.playVideo();
+                  }
+                }, 50);
+              } else {
+                this.isPlayingState = false;
+                this.notifyNativePause();
+                this.updateMediaSessionPlaybackState("paused");
+              }
             } else if (event.data === 0) { // ENDED
               this.isPlayingState = false;
               if (this.onEndedCallback) {
@@ -275,6 +309,7 @@ class YouTubePlayerService {
   playVideo() {
     this.userInitiatedPause = false;
     this.isPlayingState = true;
+    this.startAudioKeepAlive();
     if (this.player && typeof this.player.playVideo === 'function') {
       this.player.playVideo();
     }
@@ -339,6 +374,7 @@ class YouTubePlayerService {
     if (!song) return;
     this.currentSong = song;
     this.updateMediaSession(song);
+    this.startAudioKeepAlive();
     
     const videoId = song.songId || song.id;
     if (!videoId) return;

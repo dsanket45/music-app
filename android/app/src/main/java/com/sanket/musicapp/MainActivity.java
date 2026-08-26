@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -14,10 +15,16 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
 
     private BroadcastReceiver mediaCommandReceiver;
+    private AndroidBridge bridgeInterface;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Keep screen on during active playback if needed
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        bridgeInterface = new AndroidBridge();
 
         // Register broadcast receiver for media commands from the foreground service
         mediaCommandReceiver = new BroadcastReceiver() {
@@ -48,15 +55,29 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onStart() {
         super.onStart();
+        setupWebViewSettings();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        setupWebViewSettings();
+        if (this.bridge != null && this.bridge.getWebView() != null) {
+            this.bridge.getWebView().resumeTimers();
+        }
+    }
+
+    private void setupWebViewSettings() {
         if (this.bridge != null && this.bridge.getWebView() != null) {
             WebView webView = this.bridge.getWebView();
             WebSettings settings = webView.getSettings();
             settings.setMediaPlaybackRequiresUserGesture(false);
             settings.setJavaScriptEnabled(true);
             settings.setDomStorageEnabled(true);
+            settings.setDatabaseEnabled(true);
 
             // Add JavaScript interface for native bridge communication
-            webView.addJavascriptInterface(new AndroidBridge(), "AndroidBridge");
+            webView.addJavascriptInterface(bridgeInterface, "AndroidBridge");
         }
     }
 
@@ -77,7 +98,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onPause() {
         super.onPause();
-        // Keep WebView timers running for background audio
+        // Keep WebView active for background audio playback
         if (this.bridge != null && this.bridge.getWebView() != null) {
             this.bridge.getWebView().resumeTimers();
         }
@@ -86,7 +107,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onStop() {
         super.onStop();
-        // Keep WebView timers running for background audio
+        // Keep WebView active for background audio playback
         if (this.bridge != null && this.bridge.getWebView() != null) {
             this.bridge.getWebView().resumeTimers();
         }
@@ -95,7 +116,9 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         if (mediaCommandReceiver != null) {
-            unregisterReceiver(mediaCommandReceiver);
+            try {
+                unregisterReceiver(mediaCommandReceiver);
+            } catch (Exception e) {}
         }
         super.onDestroy();
     }
@@ -114,10 +137,14 @@ public class MainActivity extends BridgeActivity {
             intent.putExtra("artist", artist);
             intent.putExtra("thumbnail", thumbnail);
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                MainActivity.this.startForegroundService(intent);
-            } else {
-                MainActivity.this.startService(intent);
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    MainActivity.this.startForegroundService(intent);
+                } else {
+                    MainActivity.this.startService(intent);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
 
@@ -125,21 +152,33 @@ public class MainActivity extends BridgeActivity {
         public void pauseService() {
             Intent intent = new Intent(MainActivity.this, MusicPlaybackService.class);
             intent.setAction(MusicPlaybackService.ACTION_PAUSE);
-            MainActivity.this.startService(intent);
+            try {
+                MainActivity.this.startService(intent);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         @JavascriptInterface
         public void resumeService() {
             Intent intent = new Intent(MainActivity.this, MusicPlaybackService.class);
             intent.setAction(MusicPlaybackService.ACTION_PLAY);
-            MainActivity.this.startService(intent);
+            try {
+                MainActivity.this.startService(intent);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         @JavascriptInterface
         public void stopService() {
             Intent intent = new Intent(MainActivity.this, MusicPlaybackService.class);
             intent.setAction(MusicPlaybackService.ACTION_STOP);
-            MainActivity.this.startService(intent);
+            try {
+                MainActivity.this.startService(intent);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         @JavascriptInterface
@@ -149,7 +188,11 @@ public class MainActivity extends BridgeActivity {
             intent.putExtra("title", title);
             intent.putExtra("artist", artist);
             intent.putExtra("thumbnail", thumbnail);
-            MainActivity.this.startService(intent);
+            try {
+                MainActivity.this.startService(intent);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 }
