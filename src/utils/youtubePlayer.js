@@ -92,10 +92,27 @@ class YouTubePlayerService {
           },
           onStateChange: (event) => {
             console.log("🎛️ YouTube Player State Change:", event.data);
+
+            // Auto-resume background playback if YouTube iframe API paused while app is hidden
+            if (event.data === 2 && document.hidden && this.isPlayingState) {
+              console.log("⚡ App in background - Auto-resuming background playback...");
+              setTimeout(() => {
+                if (this.player && typeof this.player.playVideo === 'function') {
+                  this.player.playVideo();
+                }
+              }, 150);
+            }
+
+            if (event.data === 1) {
+              this.isPlayingState = true;
+            } else if (event.data === 2 && !document.hidden) {
+              this.isPlayingState = false;
+            }
+
             if (this.onStateChangeCallback) {
               this.onStateChangeCallback(event.data);
             }
-            
+
             // Update Media Session playback state
             this.updateMediaSessionPlaybackState(event.data);
           },

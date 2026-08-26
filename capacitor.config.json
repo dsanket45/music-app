@@ -11,8 +11,6 @@
     }
   },
   "server": {
-    "url": "https://dsmusics.netlify.app",
-    "cleartext": true,
     "androidScheme": "https"
   }
 }
