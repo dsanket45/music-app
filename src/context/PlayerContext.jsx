@@ -1,12 +1,7 @@
-import React, { createContext, useState, useEffect, useRef } from "react";
-import { nativeAudioEngine } from "../utils/nativeAudioEngine";
+import React, { createContext, useState, useEffect } from "react";
+import { youtubePlayer } from "../utils/youtubePlayer";
 import { addRecentlyPlayed, addMostPlayed } from "../utils/db";
-import { 
-  searchYouTube, 
-  getTrendingIndianMusic,
-  getRelatedVideos,
-  getFreshTrending 
-} from "../utils/search.js";
+import { searchYouTube, getTrendingIndianMusic } from "../utils/search.js";
 
 export const PlayerContext = createContext();
 
@@ -19,20 +14,16 @@ export const PlayerProvider = ({ children }) => {
   const [volume, setVolume] = useState(80);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isYouTubeMode, setIsYouTubeMode] = useState(false);
   const [playedGlobalIds, setPlayedGlobalIds] = useState(new Set());
-  const [currentLanguage, setCurrentLanguage] = useState(null);
   const [darkMode, setDarkMode] = useState(true);
 
   const currentSong = queue[currentIndex];
-  const rafRef = useRef(null);
 
-  // Load dark theme
   useEffect(() => {
     document.documentElement.classList.add('dark');
   }, []);
 
-  // Make context available globally for Media Session API and Native Bridge
+  // Make context available globally for Media Session & Android Bridge
   useEffect(() => {
     window.playerContext = {
       nextSong: () => nextSong(),
@@ -46,38 +37,31 @@ export const PlayerProvider = ({ children }) => {
     };
   }, [currentSong, currentIndex, queue, isPlaying]);
 
-  // Sync state with native audio engine
+  // Sync state with youtubePlayer
   useEffect(() => {
-    nativeAudioEngine.onStateChange((state) => {
+    youtubePlayer.onStateChange((state) => {
       setIsPlaying(state === 1);
+      if (state === 1) {
+        setDuration(youtubePlayer.getDuration());
+      }
     });
 
-    nativeAudioEngine.onTimeUpdate((time) => {
+    youtubePlayer.onTimeUpdate((time) => {
       setCurrentTime(time);
-      setDuration(nativeAudioEngine.getDuration());
+      const dur = youtubePlayer.getDuration();
+      if (dur > 0) setDuration(dur);
     });
 
-    nativeAudioEngine.onEnded(() => {
+    youtubePlayer.onEnded(() => {
       nextSong();
     });
   }, [currentIndex, queue, repeat, shuffle]);
 
-  // Smooth time update animation loop
-  useEffect(() => {
-    const update = () => {
-      setCurrentTime(nativeAudioEngine.getCurrentTime());
-      setDuration(nativeAudioEngine.getDuration());
-      rafRef.current = requestAnimationFrame(update);
-    };
-    rafRef.current = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, []);
-
-  // 🎵 Play current song when it changes
+  // Play song when currentSong changes
   useEffect(() => {
     if (!currentSong) return;
 
-    console.log("🎯 Playing direct audio stream:", currentSong.title, currentSong.artist);
+    console.log("🎯 Loading and playing full track:", currentSong.title);
 
     const playSong = async () => {
       try {
@@ -85,16 +69,13 @@ export const PlayerProvider = ({ children }) => {
         await addMostPlayed(currentSong);
         setPlayedGlobalIds(prev => new Set([...prev, currentSong.globalId]));
 
-        if (currentSong.language) {
-          setCurrentLanguage(currentSong.language);
-        }
-
-        await nativeAudioEngine.loadAndPlay(currentSong);
-        nativeAudioEngine.setVolume(volume);
+        await youtubePlayer.loadAndPlay(currentSong);
+        youtubePlayer.setVolume(volume);
         setIsPlaying(true);
+        setCurrentTime(0);
+        setDuration(currentSong.durationSec || 210);
       } catch (err) {
         console.error("❌ Playback failed:", err);
-        setIsPlaying(false);
       }
     };
 
@@ -102,12 +83,11 @@ export const PlayerProvider = ({ children }) => {
   }, [currentSong]);
 
   const nextSong = async () => {
-    console.log("⏭️ Next song requested");
     if (!queue.length) return;
 
     if (repeat === "one" && currentSong) {
-      nativeAudioEngine.seekTo(0);
-      nativeAudioEngine.play();
+      youtubePlayer.seekTo(0);
+      youtubePlayer.play();
       setIsPlaying(true);
       return;
     }
@@ -127,7 +107,6 @@ export const PlayerProvider = ({ children }) => {
         if (repeat === "all") {
           nextIndex = 0;
         } else {
-          // Auto fetch recommendation to keep infinite music playing
           try {
             const recommendations = await searchYouTube(currentSong?.title || "popular hits");
             const newSongs = recommendations.filter(s => s.songId !== currentSong?.songId);
@@ -148,12 +127,10 @@ export const PlayerProvider = ({ children }) => {
   };
 
   const prevSong = () => {
-    console.log("⏮️ Previous song requested");
     if (!queue.length) return;
 
-    // If played more than 3 seconds, restart current song
     if (currentTime > 3) {
-      nativeAudioEngine.seekTo(0);
+      youtubePlayer.seekTo(0);
       return;
     }
 
@@ -166,11 +143,10 @@ export const PlayerProvider = ({ children }) => {
 
   const setNewQueue = (songs, startIndex = 0) => {
     if (!songs || !songs.length) return;
-    console.log("🆕 Setting new queue:", songs.length, "songs, start index:", startIndex);
+    console.log("🆕 Queue set:", songs.length, "songs, start index:", startIndex);
     setQueue(songs);
     setCurrentIndex(startIndex);
     setIsPlaying(true);
-    setPlayedGlobalIds(new Set());
   };
 
   const addToQueue = (songs) => {
@@ -181,22 +157,22 @@ export const PlayerProvider = ({ children }) => {
   const togglePlayPause = () => {
     if (!currentSong) return;
     if (isPlaying) {
-      nativeAudioEngine.pause();
+      youtubePlayer.pause();
       setIsPlaying(false);
     } else {
-      nativeAudioEngine.play();
+      youtubePlayer.play();
       setIsPlaying(true);
     }
   };
 
   const handleSeek = (time) => {
-    nativeAudioEngine.seekTo(time);
+    youtubePlayer.seekTo(time);
     setCurrentTime(time);
   };
 
   const handleVolumeChange = (vol) => {
     setVolume(vol);
-    nativeAudioEngine.setVolume(vol);
+    youtubePlayer.setVolume(vol);
   };
 
   return (

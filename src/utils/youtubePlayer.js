@@ -8,9 +8,13 @@ class YouTubePlayerService {
     this.resolveReady = null;
     this.apiLoadPromise = null;
     this.onStateChangeCallback = null;
+    this.onTimeUpdateCallback = null;
+    this.onEndedCallback = null;
     this.isInitializing = false;
     this.currentSong = null;
     this.isPlayingState = false;
+    this.userInitiatedPause = false;
+    this.timeUpdateTimer = null;
 
     // Listen for native media commands from Android foreground service
     window.nativeMediaCommand = (command) => {
@@ -34,14 +38,28 @@ class YouTubePlayerService {
           break;
       }
     };
+
+    this.startTimeTicker();
   }
 
-  // Check if running inside native Android Capacitor app
+  startTimeTicker() {
+    if (this.timeUpdateTimer) clearInterval(this.timeUpdateTimer);
+    this.timeUpdateTimer = setInterval(() => {
+      if (this.isPlayingState && this.player && typeof this.player.getCurrentTime === 'function') {
+        try {
+          const t = this.player.getCurrentTime();
+          if (this.onTimeUpdateCallback && typeof t === 'number' && !isNaN(t)) {
+            this.onTimeUpdateCallback(t);
+          }
+        } catch (e) {}
+      }
+    }, 250);
+  }
+
   isNativeApp() {
     return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   }
 
-  // Check if AndroidBridge is available
   hasAndroidBridge() {
     return typeof window.AndroidBridge !== 'undefined';
   }
@@ -93,7 +111,7 @@ class YouTubePlayerService {
       this.player = new window.YT.Player("youtube-player-container", {
         videoId: "",
         playerVars: {
-          autoplay: 0,
+          autoplay: 1,
           controls: 0,
           disablekb: 1,
           fs: 0,
@@ -112,8 +130,6 @@ class YouTubePlayerService {
             console.log("✅ YouTube Player Ready");
             this.playerReady = true;
             this.isInitializing = false;
-            
-            // Initialize Media Session API (for web + extra controls)
             this.initMediaSession();
             
             if (this.resolveReady) {
@@ -125,25 +141,20 @@ class YouTubePlayerService {
           onStateChange: (event) => {
             console.log("🎛️ YouTube Player State:", event.data);
 
-            if (event.data === 1) {
+            if (event.data === 1) { // PLAYING
               this.isPlayingState = true;
               this.userInitiatedPause = false;
               this.notifyNativePlay();
-            } else if (event.data === 2) {
-              if (!this.userInitiatedPause) {
-                console.log("⚡ Auto-resuming background playback...");
-                setTimeout(() => {
-                  if (this.player && typeof this.player.playVideo === 'function') {
-                    this.player.playVideo();
-                  }
-                }, 50);
-              } else {
-                this.isPlayingState = false;
-                this.notifyNativePause();
-              }
-            } else if (event.data === 0) {
+              this.updateMediaSessionPlaybackState("playing");
+            } else if (event.data === 2) { // PAUSED
               this.isPlayingState = false;
-              if (window.playerContext && window.playerContext.nextSong) {
+              this.notifyNativePause();
+              this.updateMediaSessionPlaybackState("paused");
+            } else if (event.data === 0) { // ENDED
+              this.isPlayingState = false;
+              if (this.onEndedCallback) {
+                this.onEndedCallback();
+              } else if (window.playerContext && window.playerContext.nextSong) {
                 window.playerContext.nextSong();
               }
             }
@@ -151,36 +162,28 @@ class YouTubePlayerService {
             if (this.onStateChangeCallback) {
               this.onStateChangeCallback(event.data);
             }
-
-            // Update Media Session playback state
-            this.updateMediaSessionPlaybackState(event.data);
           },
           onError: (error) => {
             console.error("❌ YouTube Player Error:", error);
             this.isInitializing = false;
-            reject(error);
+            if (window.playerContext && window.playerContext.nextSong) {
+              window.playerContext.nextSong();
+            }
           },
         },
       });
     });
   }
 
-  // ============================================
-  // NATIVE ANDROID BRIDGE METHODS
-  // ============================================
-
   notifyNativePlay() {
     if (this.hasAndroidBridge() && this.currentSong) {
       try {
         window.AndroidBridge.startService(
-          this.currentSong.title || 'Unknown',
+          this.currentSong.title || 'D Music',
           this.currentSong.artist || 'Unknown Artist',
           this.currentSong.thumbnail || ''
         );
-        console.log('📱 Native service: PLAY');
-      } catch (e) {
-        console.warn('AndroidBridge.startService error:', e);
-      }
+      } catch (e) {}
     }
   }
 
@@ -188,21 +191,7 @@ class YouTubePlayerService {
     if (this.hasAndroidBridge()) {
       try {
         window.AndroidBridge.pauseService();
-        console.log('📱 Native service: PAUSE');
-      } catch (e) {
-        console.warn('AndroidBridge.pauseService error:', e);
-      }
-    }
-  }
-
-  notifyNativeStop() {
-    if (this.hasAndroidBridge()) {
-      try {
-        window.AndroidBridge.stopService();
-        console.log('📱 Native service: STOP');
-      } catch (e) {
-        console.warn('AndroidBridge.stopService error:', e);
-      }
+      } catch (e) {}
     }
   }
 
@@ -210,59 +199,40 @@ class YouTubePlayerService {
     if (this.hasAndroidBridge() && song) {
       try {
         window.AndroidBridge.updateMetadata(
-          song.title || 'Unknown',
+          song.title || 'D Music',
           song.artist || 'Unknown Artist',
           song.thumbnail || ''
         );
-        console.log('📱 Native metadata updated:', song.title);
-      } catch (e) {
-        console.warn('AndroidBridge.updateMetadata error:', e);
-      }
+      } catch (e) {}
     }
   }
 
-  // ============================================
-  // MEDIA SESSION API (Web + Fallback)
-  // ============================================
-
   initMediaSession() {
     if ('mediaSession' in navigator) {
-      console.log("🎵 Initializing Media Session API");
-      
-      navigator.mediaSession.setActionHandler('play', () => {
-        this.playVideo();
-      });
-
-      navigator.mediaSession.setActionHandler('pause', () => {
-        this.pauseVideo();
-      });
-
+      navigator.mediaSession.setActionHandler('play', () => this.playVideo());
+      navigator.mediaSession.setActionHandler('pause', () => this.pauseVideo());
       navigator.mediaSession.setActionHandler('previoustrack', () => {
         if (window.playerContext && window.playerContext.prevSong) {
           window.playerContext.prevSong();
         }
       });
-
       navigator.mediaSession.setActionHandler('nexttrack', () => {
         if (window.playerContext && window.playerContext.nextSong) {
           window.playerContext.nextSong();
         }
       });
-
       navigator.mediaSession.setActionHandler('seekbackward', (details) => {
         const seekTime = this.getCurrentTime() - (details.seekOffset || 10);
         this.seekTo(Math.max(0, seekTime));
       });
-
       navigator.mediaSession.setActionHandler('seekforward', (details) => {
         const seekTime = this.getCurrentTime() + (details.seekOffset || 10);
-        const duration = this.getDuration();
-        this.seekTo(Math.min(duration, seekTime));
+        this.seekTo(Math.min(this.getDuration(), seekTime));
       });
-
-      navigator.mediaSession.setActionHandler('stop', () => {
-        this.pauseVideo();
-        this.notifyNativeStop();
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime !== undefined) {
+          this.seekTo(details.seekTime);
+        }
       });
     }
   }
@@ -285,26 +255,15 @@ class YouTubePlayerService {
         ]
       });
 
-      // Also update native Android notification metadata
       this.notifyNativeMetadata(song);
     }
   }
 
   updateMediaSessionPlaybackState(state) {
     if ('mediaSession' in navigator) {
-      if (state === 1) {
-        navigator.mediaSession.playbackState = 'playing';
-      } else if (state === 2) {
-        navigator.mediaSession.playbackState = 'paused';
-      } else if (state === 0) {
-        navigator.mediaSession.playbackState = 'none';
-      }
+      navigator.mediaSession.playbackState = state;
     }
   }
-
-  // ============================================
-  // PLAYBACK CONTROLS
-  // ============================================
 
   waitForPlayerReady() {
     if (this.playerReady) return Promise.resolve();
@@ -314,7 +273,6 @@ class YouTubePlayerService {
   }
 
   playVideo() {
-    console.log("▶️ Play");
     this.userInitiatedPause = false;
     this.isPlayingState = true;
     if (this.player && typeof this.player.playVideo === 'function') {
@@ -323,12 +281,19 @@ class YouTubePlayerService {
   }
 
   pauseVideo() {
-    console.log("⏸️ Pause");
     this.userInitiatedPause = true;
     this.isPlayingState = false;
     if (this.player && typeof this.player.pauseVideo === 'function') {
       this.player.pauseVideo();
     }
+  }
+
+  play() {
+    this.playVideo();
+  }
+
+  pause() {
+    this.pauseVideo();
   }
 
   seekTo(seconds) {
@@ -350,38 +315,49 @@ class YouTubePlayerService {
   }
 
   getDuration() {
-    return this.player && typeof this.player.getDuration === 'function'
-      ? this.player.getDuration()
-      : 0;
+    const dur = this.player && typeof this.player.getDuration === 'function' ? this.player.getDuration() : 0;
+    return dur > 0 ? dur : (this.currentSong?.durationSec || 210);
   }
 
   onStateChange(callback) {
     this.onStateChangeCallback = callback;
   }
 
+  onTimeUpdate(callback) {
+    this.onTimeUpdateCallback = callback;
+  }
+
+  onEnded(callback) {
+    this.onEndedCallback = callback;
+  }
+
   isReady() {
     return this.playerReady;
   }
 
-  getCurrentVideoId() {
-    return this.currentVideoId;
-  }
-
-  async ensureVideoLoaded(videoId) {
-    if (!videoId) throw new Error("No videoId provided");
+  async loadAndPlay(song) {
+    if (!song) return;
+    this.currentSong = song;
+    this.updateMediaSession(song);
     
+    const videoId = song.songId || song.id;
+    if (!videoId) return;
+
     await this.initialize();
     await this.waitForPlayerReady();
 
-    // Only load if it's a different video
     if (this.currentVideoId !== videoId) {
-      console.log("🆕 Loading new video:", videoId);
       this.currentVideoId = videoId;
-      this.player.loadVideoById(videoId);
+      this.player.loadVideoById({
+        videoId: videoId,
+        startSeconds: 0
+      });
+      this.playVideo();
     } else {
-      console.log("✅ Video already loaded:", videoId);
+      this.playVideo();
     }
   }
 }
 
 export const youtubePlayer = new YouTubePlayerService();
+export const nativeAudioEngine = youtubePlayer;

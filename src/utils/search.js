@@ -9,7 +9,7 @@ export const cleanTitle = (title) => {
     .replace(/&#039;/g, "'")
     .replace(/\s*\|\s*[^|]*$/g, '')
     .replace(/\[[^\]]*\]/g, '')
-    .replace(/\([^)]*(video|audio|lyrics|hd|4k)[^)]*\)/gi, '')
+    .replace(/\([^)]*(official|video|audio|lyrics|hd|4k|full song|full video)[^)]*\)/gi, '')
     .trim();
 };
 
@@ -19,6 +19,8 @@ export const cleanArtist = (artist) => {
     .replace(/&quot;/g, '"')
     .replace(/&amp;/g, '&')
     .replace(/&#039;/g, "'")
+    .replace(/ - Topic$/i, '')
+    .replace(/VEVO$/i, '')
     .trim();
 };
 
@@ -28,219 +30,195 @@ export const getGlobalSongId = (title) => {
     .replace(/[^a-z0-9]/g, '');
 };
 
-// Verified Instant-Play Catalog with 100% Guaranteed 200 OK Audio Streams
-const VERIFIED_CATALOG = [
+// Verified Full-Length Instant Catalog
+const FULL_LENGTH_CATALOG = [
   {
-    songId: "kesariya",
-    id: "kesariya",
+    songId: "BddP6PYo2gs",
+    id: "BddP6PYo2gs",
     title: "Kesariya",
     artist: "Arijit Singh, Pritam",
-    album: "Brahmastra",
-    thumbnail: "https://c.saavncdn.com/871/Brahmastra-Original-Motion-Picture-Soundtrack-Hindi-2022-20221006155213-500x500.jpg",
-    mediaUrl: "https://jiotunepreview.jio.com/content/Converted/010910141580615.mp3",
+    album: "Brahmāstra",
+    thumbnail: "https://i.ytimg.com/vi/BddP6PYo2gs/hqdefault.jpg",
     duration: "4:28",
     durationSec: 268,
     language: "hindi",
     globalId: "kesariya"
   },
   {
-    songId: "chaleya",
-    id: "chaleya",
+    songId: "VAdGW7QDJhU",
+    id: "VAdGW7QDJhU",
     title: "Chaleya",
     artist: "Anirudh Ravichander, Arijit Singh, Shilpa Rao",
     album: "Jawan",
-    thumbnail: "https://c.saavncdn.com/026/Jawan-Hindi-2023-20230905151010-500x500.jpg",
-    mediaUrl: "https://jiotunepreview.jio.com/content/Converted/010910092002187.mp3",
+    thumbnail: "https://i.ytimg.com/vi/VAdGW7QDJhU/hqdefault.jpg",
     duration: "3:20",
     durationSec: 200,
     language: "hindi",
     globalId: "chaleya"
   },
   {
-    songId: "apnabanale",
-    id: "apnabanale",
+    songId: "ElZfdU54Cp8",
+    id: "ElZfdU54Cp8",
     title: "Apna Bana Le",
     artist: "Sachin-Jigar, Arijit Singh",
     album: "Bhediya",
-    thumbnail: "https://c.saavncdn.com/228/Sachin-Jigar-Bollywood-Hits-Hindi-2026-20260630213800-500x500.jpg",
-    mediaUrl: "https://jiotunepreview.jio.com/content/Converted/010910441686043.mp3",
+    thumbnail: "https://i.ytimg.com/vi/ElZfdU54Cp8/hqdefault.jpg",
     duration: "4:21",
     durationSec: 261,
     language: "hindi",
     globalId: "apnabanale"
   },
   {
-    songId: "tumhiho",
-    id: "tumhiho",
+    songId: "IJq0ydz4438",
+    id: "IJq0ydz4438",
     title: "Tum Hi Ho",
     artist: "Mithoon, Arijit Singh",
     album: "Aashiqui 2",
-    thumbnail: "https://c.saavncdn.com/430/Aashiqui-2-Hindi-2013-500x500.jpg",
-    mediaUrl: "https://jiotunepreview.jio.com/content/Converted/010910092419390.mp3",
+    thumbnail: "https://i.ytimg.com/vi/IJq0ydz4438/hqdefault.jpg",
     duration: "4:22",
     durationSec: 262,
     language: "hindi",
     globalId: "tumhiho"
   },
   {
-    songId: "believer",
-    id: "believer",
+    songId: "7wtfhZwyrcc",
+    id: "7wtfhZwyrcc",
     title: "Believer",
     artist: "Imagine Dragons",
     album: "Evolve",
-    thumbnail: "https://c.saavncdn.com/217/AiSh-Vol-4-Hindi-2020-20251121215417-500x500.jpg",
-    mediaUrl: "https://jiotunepreview.jio.com/content/Converted/010912291111348.mp3",
+    thumbnail: "https://i.ytimg.com/vi/7wtfhZwyrcc/hqdefault.jpg",
     duration: "3:24",
     durationSec: 204,
     language: "english",
     globalId: "believer"
   },
   {
-    songId: "gehrahua",
-    id: "gehrahua",
-    title: "Gehra Hua",
-    artist: "Shashwat Sachdev, Arijit Singh",
-    album: "Dhurandhar",
-    thumbnail: "https://c.saavncdn.com/450/Gehra-Hua-From-Dhurandhar-Hindi-2025-20251205154217-500x500.jpg",
-    mediaUrl: "https://jiotunepreview.jio.com/content/Converted/010912023403849.mp3",
-    duration: "3:40",
-    durationSec: 220,
-    language: "hindi",
-    globalId: "gehrahua"
+    songId: "OsU0HnnVznU",
+    id: "OsU0HnnVznU",
+    title: "Naatu Naatu",
+    artist: "Rahul Sipligunj, Kaala Bhairava",
+    album: "RRR",
+    thumbnail: "https://i.ytimg.com/vi/OsU0HnnVznU/hqdefault.jpg",
+    duration: "3:34",
+    durationSec: 214,
+    language: "telugu",
+    globalId: "naatunaatu"
   },
   {
-    songId: "raataanlambiyan",
-    id: "raataanlambiyan",
+    songId: "gvyUuxdRdR4",
+    id: "gvyUuxdRdR4",
     title: "Raataan Lambiyan",
     artist: "Tanishk Bagchi, Jubin Nautiyal, Asees Kaur",
     album: "Shershaah",
-    thumbnail: "https://c.saavncdn.com/238/Shershaah-Original-Motion-Picture-Soundtrack--Hindi-2021-20210815181610-500x500.jpg",
-    mediaUrl: "https://jiotunepreview.jio.com/content/Converted/010910141580615.mp3",
+    thumbnail: "https://i.ytimg.com/vi/gvyUuxdRdR4/hqdefault.jpg",
     duration: "3:50",
     durationSec: 230,
     language: "hindi",
     globalId: "raataanlambiyan"
   },
   {
-    songId: "peeloon",
-    id: "peeloon",
+    songId: "HjAdfT5aP_Q",
+    id: "HjAdfT5aP_Q",
     title: "Pee Loon",
     artist: "Pritam, Mohit Chauhan",
     album: "Once Upon A Time In Mumbaai",
-    thumbnail: "https://c.saavncdn.com/512/Once-Upon-A-Time-In-Mumbaai-Hindi-2010-20241223141749-500x500.jpg",
-    mediaUrl: "https://jiotunepreview.jio.com/content/Converted/010910092419390.mp3",
+    thumbnail: "https://i.ytimg.com/vi/HjAdfT5aP_Q/hqdefault.jpg",
     duration: "4:45",
     durationSec: 285,
     language: "hindi",
     globalId: "peeloon"
+  },
+  {
+    songId: "2TGlyLq_Z8I",
+    id: "2TGlyLq_Z8I",
+    title: "O Maahi",
+    artist: "Pritam, Arijit Singh",
+    album: "Dunki",
+    thumbnail: "https://i.ytimg.com/vi/2TGlyLq_Z8I/hqdefault.jpg",
+    duration: "3:53",
+    durationSec: 233,
+    language: "hindi",
+    globalId: "omaahi"
   }
 ];
 
 /**
- * Direct Audio Search with guaranteed playable stream extraction
+ * Direct Live Full-Length Search with YouTube Innertube
  */
 export const searchYouTube = async (query) => {
   if (!query || !query.trim()) {
-    return VERIFIED_CATALOG;
+    return FULL_LENGTH_CATALOG;
   }
 
   const cleanQuery = query.trim().toLowerCase();
-  console.log("🔍 Live Audio Search:", cleanQuery);
+  console.log("🔍 Live Search Full Length:", cleanQuery);
 
-  // Local match for ultra-fast response
-  const localMatches = VERIFIED_CATALOG.filter(s => 
+  // Local instant match
+  const localMatches = FULL_LENGTH_CATALOG.filter(s => 
     s.title.toLowerCase().includes(cleanQuery) || 
     s.artist.toLowerCase().includes(cleanQuery)
   );
 
-  // 1. Try JioSaavn Vercel API
+  // YouTube Innertube Search API (Zero API Keys Required, Full Results)
   try {
-    const res = await axios.get('https://jiosaavn-api.vercel.app/search', {
-      params: { query: cleanQuery },
-      timeout: 7000
-    });
+    const res = await axios.post(
+      'https://www.youtube.com/youtubei/v1/search?prettyPrint=false',
+      {
+        context: {
+          client: {
+            clientName: 'WEB',
+            clientVersion: '2.20231201.00.00'
+          }
+        },
+        query: `${cleanQuery} song`
+      },
+      { timeout: 7000 }
+    );
 
-    if (res.data?.results?.length > 0) {
-      const songs = res.data.results.map(item => {
-        const title = cleanTitle(item.title || item.song);
-        const artist = cleanArtist(item.more_info?.singers || item.primary_artists || item.artist || item.description);
-        const thumbnail = (item.images?.['500x500'] || item.images?.['150x150'] || item.image || '')
-          .replace('150x150', '500x500')
-          .replace('50x50', '500x500');
-        const mediaUrl = item.more_info?.vlink || item.vlink || "https://jiotunepreview.jio.com/content/Converted/010910141580615.mp3";
+    const section = res.data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents;
 
-        return {
-          songId: item.id,
-          id: item.id,
-          title,
-          artist,
-          thumbnail,
-          album: item.album || 'Single',
-          duration: item.duration || '3:30',
-          durationSec: parseSeconds(item.duration),
-          mediaUrl,
-          language: item.more_info?.language?.toLowerCase() || 'hindi',
-          globalId: getGlobalSongId(title)
-        };
-      });
+    if (section && section.length > 0) {
+      const results = [];
+      for (const item of section) {
+        const v = item.videoRenderer;
+        if (v && v.videoId) {
+          const rawTitle = v.title?.runs?.[0]?.text || '';
+          const rawArtist = v.ownerText?.runs?.[0]?.text || '';
+          const durationStr = v.lengthText?.simpleText || '3:30';
+          const thumb = v.thumbnail?.thumbnails?.[v.thumbnail.thumbnails.length - 1]?.url || `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
 
-      return [...localMatches, ...songs.filter(s => !localMatches.some(lm => lm.title === s.title))];
+          results.push({
+            songId: v.videoId,
+            id: v.videoId,
+            title: cleanTitle(rawTitle),
+            artist: cleanArtist(rawArtist),
+            album: 'Single',
+            duration: durationStr,
+            durationSec: parseSeconds(durationStr),
+            thumbnail: thumb,
+            language: 'hindi',
+            globalId: getGlobalSongId(rawTitle)
+          });
+        }
+      }
+
+      if (results.length > 0) {
+        return [...localMatches, ...results.filter(r => !localMatches.some(lm => lm.songId === r.songId))];
+      }
     }
   } catch (err) {
-    console.warn("JioSaavn Vercel search fallback:", err.message);
+    console.warn("YouTube Innertube search error, using catalog:", err.message);
   }
 
-  // 2. Try official JioSaavn autocomplete API
-  try {
-    const res = await axios.get('https://www.jiosaavn.com/api.php', {
-      params: {
-        __call: 'autocomplete.get',
-        _format: 'json',
-        _marker: '0',
-        cc: 'in',
-        includeMetaTags: '1',
-        query: cleanQuery
-      },
-      timeout: 6000
-    });
-
-    if (res.data?.songs?.data?.length > 0) {
-      const songs = res.data.songs.data.map(item => {
-        const title = cleanTitle(item.title);
-        const artist = cleanArtist(item.description || item.more_info?.primary_artists || item.music);
-        const thumbnail = (item.image || '').replace('50x50', '500x500').replace('150x150', '500x500');
-        const mediaUrl = item.more_info?.vlink || "https://jiotunepreview.jio.com/content/Converted/010910141580615.mp3";
-
-        return {
-          songId: item.id,
-          id: item.id,
-          title,
-          artist,
-          thumbnail,
-          album: item.album || 'Single',
-          duration: '3:30',
-          durationSec: 210,
-          mediaUrl,
-          language: item.more_info?.language?.toLowerCase() || 'hindi',
-          globalId: getGlobalSongId(title)
-        };
-      });
-
-      return [...localMatches, ...songs.filter(s => !localMatches.some(lm => lm.title === s.title))];
-    }
-  } catch (e) {
-    console.warn("Official Saavn search error:", e.message);
-  }
-
-  return localMatches.length > 0 ? localMatches : VERIFIED_CATALOG;
+  return localMatches.length > 0 ? localMatches : FULL_LENGTH_CATALOG;
 };
 
 export const getTrendingIndianMusic = async () => {
-  return VERIFIED_CATALOG;
+  return FULL_LENGTH_CATALOG;
 };
 
-export const getRelatedVideos = async () => VERIFIED_CATALOG;
-export const getFreshTrending = async () => VERIFIED_CATALOG;
+export const getRelatedVideos = async () => FULL_LENGTH_CATALOG;
+export const getFreshTrending = async () => FULL_LENGTH_CATALOG;
 export const forceRefreshTrending = () => {};
 
 function parseSeconds(durationStr) {
