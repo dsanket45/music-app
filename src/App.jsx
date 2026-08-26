@@ -14,6 +14,7 @@ import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import InstallPrompt from "./components/InstallPrompt";
 import LottieLoader from './components/LottieLoader';
 import { Sparkles, RefreshCw } from 'lucide-react';
+import { App as CapacitorApp } from '@capacitor/app';
 
 const CURRENT_VERSION_TIMESTAMP = 1724598500000;
 
@@ -30,6 +31,29 @@ function App() {
       window.history.replaceState(null, "", user ? "/dashboard" : "/login");
     }
   }, [location.pathname, user]);
+
+  // ✅ Handle Android Native Hardware Back Button (Navigate back or minimize app)
+  useEffect(() => {
+    let backListener = null;
+    const setupBackButton = async () => {
+      try {
+        backListener = await CapacitorApp.addListener('backButton', () => {
+          if (location.pathname !== '/dashboard' && location.pathname !== '/login' && window.history.length > 1) {
+            window.history.back();
+          } else {
+            CapacitorApp.minimizeApp();
+          }
+        });
+      } catch (err) {
+        console.warn('Capacitor App backButton listener error:', err);
+      }
+    };
+    setupBackButton();
+
+    return () => {
+      if (backListener) backListener.remove();
+    };
+  }, [location.pathname]);
 
   // Instant server version check on app launch (works on Web, APK, Login page, Dashboard)
   useEffect(() => {
