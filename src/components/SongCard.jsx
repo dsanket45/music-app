@@ -1,105 +1,102 @@
+// src/components/SongCard.jsx
 import React, { useContext, useState, useEffect } from 'react';
 import { PlayerContext } from '../context/PlayerContext';
 import { toggleLike, getLikedSongs } from '../utils/db';
-import { Play, Heart } from 'lucide-react';
+import { Play, Pause, Heart } from 'lucide-react';
 
 const SongCard = ({ song }) => {
-  const { setNewQueue, currentSong, isPlaying } = useContext(PlayerContext);
+  const { setNewQueue, currentSong, isPlaying, togglePlayPause } = useContext(PlayerContext);
   const [isLiked, setIsLiked] = useState(false);
-  const [likeAnimation, setLikeAnimation] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
     const checkLiked = async () => {
       const liked = await getLikedSongs();
-      setIsLiked(liked.some(s => s.songId === song.songId));
+      if (mounted) {
+        setIsLiked(liked.some(s => s.songId === song.songId || s.id === song.id));
+      }
     };
     checkLiked();
-  }, [song.songId]);
+    return () => { mounted = false; };
+  }, [song.songId, song.id]);
 
-  const handlePlay = () => {
-    setNewQueue([song], 0);
+  const isCurrentSong = (currentSong?.songId && (currentSong.songId === song.songId || currentSong.id === song.id)) ||
+                        (currentSong?.title && currentSong.title === song.title);
+
+  const handleCardClick = () => {
+    if (isCurrentSong) {
+      togglePlayPause();
+    } else {
+      setNewQueue([song], 0);
+    }
   };
 
   const handleLike = async (e) => {
     e.stopPropagation();
-    setLikeAnimation(true);
     const liked = await toggleLike(song);
     setIsLiked(liked);
-    setTimeout(() => setLikeAnimation(false), 600);
   };
-
-  const isActive = currentSong?.songId === song.songId && isPlaying;
 
   return (
     <div
-      onClick={handlePlay}
-      className={`group relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer ${
-        isActive 
-          ? 'ring-2 ring-green-500 shadow-green-500/30' 
-          : 'hover:scale-105'
-      }`}
+      onClick={handleCardClick}
+      className="group relative bg-[#181818] hover:bg-[#282828] p-3.5 rounded-lg transition-all duration-300 cursor-pointer flex flex-col justify-between"
     >
-      <div className="relative overflow-hidden rounded-xl">
+      {/* Artwork Container */}
+      <div className="relative w-full aspect-square rounded-md overflow-hidden bg-[#282828] mb-3 shadow-md">
         <img
-          src={song.thumbnail || 'https://via.placeholder.com/300/10B981/ffffff?text=Music'}
+          src={song.thumbnail || 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&h=300&fit=crop'}
           alt={song.title}
-          className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-110"
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           onError={(e) => {
-            e.target.src = 'https://via.placeholder.com/300/10B981/ffffff?text=No+Image';
+            e.target.src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&h=300&fit=crop';
           }}
         />
-        
-        {/* Play Button Overlay */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-          <div className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center shadow-2xl transform scale-90 group-hover:scale-100 transition-transform duration-300">
-            <Play size={24} fill="white" className="text-white ml-1" />
-          </div>
+
+        {/* Floating Spotify Green Play Button */}
+        <div
+          className={`absolute bottom-2 right-2 w-11 h-11 rounded-full bg-[#1DB954] hover:bg-[#1ED760] hover:scale-105 flex items-center justify-center shadow-xl transition-all duration-300 transform ${
+            isCurrentSong && isPlaying
+              ? 'opacity-100 translate-y-0 scale-100'
+              : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
+          }`}
+        >
+          {isCurrentSong && isPlaying ? (
+            <Pause size={20} fill="#000000" className="text-black" />
+          ) : (
+            <Play size={20} fill="#000000" className="text-black ml-0.5" />
+          )}
         </div>
 
-        {/* Active Playing Animation */}
-        {isActive && (
-          <div className="absolute inset-0 bg-gradient-to-t from-green-500/30 to-transparent flex items-center justify-center">
-            <div className="flex gap-1 items-end h-8">
-              <div className="w-1 bg-green-500 rounded-full animate-pulse" style={{ height: '40%', animationDelay: '0ms' }}></div>
-              <div className="w-1 bg-green-500 rounded-full animate-pulse" style={{ height: '80%', animationDelay: '150ms' }}></div>
-              <div className="w-1 bg-green-500 rounded-full animate-pulse" style={{ height: '60%', animationDelay: '300ms' }}></div>
-              <div className="w-1 bg-green-500 rounded-full animate-pulse" style={{ height: '90%', animationDelay: '450ms' }}></div>
-            </div>
-          </div>
-        )}
-
-        {/* Like Button */}
+        {/* Top-Right Heart / Like Button */}
         <button
           onClick={handleLike}
-          className={`absolute top-2 right-2 w-10 h-10 rounded-full backdrop-blur-md flex items-center justify-center transition-all duration-300 z-10 ${
-            isLiked 
-              ? 'bg-red-500 shadow-lg shadow-red-500/50' 
-              : 'bg-black/30 hover:bg-black/50'
-          } ${likeAnimation ? 'scale-125' : 'scale-100'}`}
-          aria-label={isLiked ? "Remove from favorites" : "Add to favorites"}
-          title={isLiked ? "Remove from favorites" : "Add to favorites"}
+          aria-label={isLiked ? "Unlike" : "Like"}
+          className={`absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center transition-all duration-200 ${
+            isLiked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}
         >
-          <Heart 
-            size={20} 
-            className={`transition-all duration-300 ${
-              isLiked ? 'text-white fill-white' : 'text-white'
+          <Heart
+            size={16}
+            className={`transition-colors ${
+              isLiked ? 'text-[#1DB954] fill-[#1DB954]' : 'text-white/80 hover:text-white'
             }`}
           />
         </button>
       </div>
 
-      <div className="mt-3">
-        <h4 className="font-semibold text-sm text-gray-900 dark:text-white line-clamp-1 mb-1">
+      {/* Song Info */}
+      <div className="flex flex-col">
+        <h3
+          className={`text-sm font-bold truncate mb-1 transition-colors ${
+            isCurrentSong ? 'text-[#1DB954]' : 'text-white group-hover:text-white'
+          }`}
+        >
           {song.title}
-        </h4>
-        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1">
+        </h3>
+        <p className="text-xs text-[#B3B3B3] truncate font-medium">
           {song.artist}
         </p>
-        {song.duration && (
-          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-            {song.duration}
-          </p>
-        )}
       </div>
     </div>
   );

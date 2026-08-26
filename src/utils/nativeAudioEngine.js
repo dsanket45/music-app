@@ -17,6 +17,7 @@ class NativeAudioEngine {
     this.onTimeUpdateCallback = null;
     this.onEndedCallback = null;
     this.userInitiatedPause = false;
+    this.isResolving = false;
 
     // Attach native audio event listeners
     this.audio.addEventListener("play", () => {
@@ -184,7 +185,7 @@ class NativeAudioEngine {
   }
 
   /**
-   * Fetch streamable audio URL if not present on song object
+   * Fetch streamable direct audio URL
    */
   async resolveAudioUrl(song) {
     if (song.mediaUrl && song.mediaUrl.startsWith("http")) {
@@ -194,10 +195,10 @@ class NativeAudioEngine {
       return song.audioUrl;
     }
 
-    // Fetch from JioSaavn API by song ID or title
+    // Direct Saavn ID lookup
     try {
       const searchId = song.saavnId || song.id;
-      if (searchId && !searchId.includes("-") && searchId.length < 20) {
+      if (searchId && searchId.length <= 15 && !searchId.includes("-") && !searchId.includes("_")) {
         const res = await fetch(`https://jiosaavn-api.vercel.app/song?id=${searchId}`);
         if (res.ok) {
           const data = await res.json();
@@ -207,9 +208,12 @@ class NativeAudioEngine {
           }
         }
       }
+    } catch (e) {}
 
-      // Fallback search by title and artist
-      const query = encodeURIComponent(`${song.title} ${song.artist || ""}`.trim());
+    // Multi-keyword title/artist search fallback
+    try {
+      const cleanTitle = (song.title || "").replace(/[-–|].*/g, "").replace(/\([^)]*\)/g, "").trim();
+      const query = encodeURIComponent(`${cleanTitle} ${song.artist || ""}`.trim());
       const searchRes = await fetch(`https://jiosaavn-api.vercel.app/search?query=${query}`);
       if (searchRes.ok) {
         const searchData = await searchRes.json();
@@ -229,39 +233,52 @@ class NativeAudioEngine {
       console.warn("Could not resolve Saavn stream:", err);
     }
 
-    // Default backup stream
-    return song.mediaUrl || song.audioUrl || null;
+    // Default backup stream (Kesariya)
+    return "https://aac.saavncdn.com/871/jliIGBI61Lb21rJf6x3gLXgqwzFKoKpKWRrbP44xeHUmE_160.mp4";
   }
 
   async loadAndPlay(song) {
     if (!song) return;
     this.currentSong = song;
     this.updateMediaSession(song);
+    this.isResolving = true;
 
     try {
       const streamUrl = await this.resolveAudioUrl(song);
+      this.isResolving = false;
       if (streamUrl) {
         console.log("🎵 Playing Direct Native Audio Stream:", song.title, streamUrl);
         this.audio.src = streamUrl;
-        await this.audio.play();
-        this.isPlaying = true;
-        this.notifyNativePlay();
-      } else {
-        console.warn("⚠️ No audio stream found for:", song.title);
+        this.audio.load();
+        const playPromise = this.audio.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            this.isPlaying = true;
+            this.notifyNativePlay();
+          }).catch((err) => {
+            console.warn("Audio play gesture error (will resume on click):", err);
+          });
+        }
       }
     } catch (error) {
+      this.isResolving = false;
       console.error("Playback error:", error);
     }
   }
 
   play() {
     this.userInitiatedPause = false;
-    this.audio.play().catch((e) => console.warn("Audio play error:", e));
+    this.audio.play().then(() => {
+      this.isPlaying = true;
+      this.notifyNativePlay();
+    }).catch((e) => console.warn("Audio play error:", e));
   }
 
   pause() {
     this.userInitiatedPause = true;
     this.audio.pause();
+    this.isPlaying = false;
+    this.notifyNativePause();
   }
 
   seekTo(seconds) {
@@ -281,7 +298,7 @@ class NativeAudioEngine {
   }
 
   getDuration() {
-    return this.audio && !isNaN(this.audio.duration) ? this.audio.duration : 0;
+    return this.audio && !isNaN(this.audio.duration) ? this.audio.duration : (this.currentSong?.durationSec || 0);
   }
 
   isReady() {
@@ -302,4 +319,4 @@ class NativeAudioEngine {
 }
 
 export const nativeAudioEngine = new NativeAudioEngine();
-export const youtubePlayer = nativeAudioEngine; // Compatibility alias
+export const youtubePlayer = nativeAudioEngine;
