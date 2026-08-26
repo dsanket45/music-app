@@ -68,7 +68,7 @@ const Navbar = () => {
   };
 
   const handleDownloadApk = () => {
-    const apkUrl = `${window.location.origin}/dmusic-v104.apk?v=${Date.now()}`;
+    const apkUrl = `https://raw.githubusercontent.com/dsanket45/music-app/main/releases/dmusic.apk?v=${Date.now()}`;
     const link = document.createElement("a");
     link.href = apkUrl;
     link.setAttribute("download", "D-Music-App.apk");
