@@ -24,6 +24,20 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public void onBackPressed() {
+        if (this.bridge != null && this.bridge.getWebView() != null) {
+            WebView webView = this.bridge.getWebView();
+            if (webView.canGoBack()) {
+                webView.goBack();
+            } else {
+                moveTaskToBack(true);
+            }
+        } else {
+            moveTaskToBack(true);
+        }
+    }
+
+    @Override
     public void onPause() {
         // Prevent Android WebView from pausing audio playback when backgrounded
         if (this.bridge != null && this.bridge.getWebView() != null) {
