@@ -3,15 +3,16 @@
   "appName": "D Music",
   "webDir": "dist",
   "bundledWebRuntime": false,
+  "server": {
+    "url": "https://dsmusics.netlify.app",
+    "cleartext": true
+  },
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 1500,
       "backgroundColor": "#0f172a",
       "showSpinner": false
     }
-  },
-  "server": {
-    "androidScheme": "https"
   },
   "android": {
     "backgroundColor": "#0f172a",
